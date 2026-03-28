@@ -1,71 +1,52 @@
 // lib/core/ai_gateway.dart
 import 'package:dio/dio.dart';
-import 'tool_box.dart'; 
 
 class AiGateway {
-  static const String _deepSeekKey = "sk-d744e85e0ca74175bdc094b8abc6996a";
   final Dio _dio = Dio();
 
+  // 【检查点】：确保这里的 IP 依然是你电脑的 IPv4 地址
+  // 端口 5000 对应 Python Flask 的默认端口
+  final String _backendUrl = "http://192.168.81.221:5000/api/chat";
+
   Future<Map<String, String>> dispatchTask(String question, String systemPrompt) async {
-    // 逻辑 A：判断是否需要激活“真·通勤助手”工具调用
-    if (systemPrompt.contains("交通") || question.contains("去") || question.contains("路况")) {
-      
-      // 1. 自动提取目的地
-      String destination = question.replaceAll(RegExp(r'去|路况|查一下|怎么样|到'), '').trim();
-      if (destination.isEmpty) destination = "目的地";
-
-      // 2. 调用高德 API 获取真实数据
-      String trafficData = await ToolBox.getRealTimeTraffic(destination);
-
-      // 3. 【核心优化】：构建强约束的 Prompt（提示词）
-      // 我们用明确的分隔符和指令，强制 AI 必须处理 trafficData
-      String enhancedPrompt = """
-        # 角色设定
-        $systemPrompt
-        
-        # 实时外部数据（高德地图提供）
-        $trafficData
-        
-        # 强制性回答规则
-        1. 严禁编造路况！你必须且只能基于上面的【实时外部数据】来回答。
-        2. 你的回答中必须包含以下要素：目的地名称、具体的距离（公里）、预计耗时（分钟）。
-        3. 请根据数据中的路径标签（如：避堵、畅通）给用户一个具体的建议。
-        4. 语气要像专业的私人管家，简明扼要。
-        
-        # 当前用户问题
-        $question
-      """;
-      
-      return await _callAI(question, enhancedPrompt, "真·通勤助手");
-    }
-
-    // 逻辑 B：普通对话模式
-    return await _callAI(question, systemPrompt, "全能内核");
-  }
-
-  Future<Map<String, String>> _callAI(String question, String prompt, String source) async {
     try {
+      // 发送请求给 Python 后端
       final response = await _dio.post(
-        'https://api.deepseek.com/chat/completions',
-        options: Options(headers: {
-          'Authorization': 'Bearer $_deepSeekKey',
-          'Content-Type': 'application/json',
-        }),
+        _backendUrl,
         data: {
-          "model": "deepseek-chat",
-          "messages": [
-            {"role": "system", "content": prompt}, // 这里的 prompt 已经包含了实时数据
-            {"role": "user", "content": question}
-          ],
-          "temperature": 0.3, // 调低随机性，让它更听话、不乱发挥
+          "question": question,
+          "system_prompt": systemPrompt,
         },
+        // 这里的 options 放在 post 方法的参数里，修复了括号嵌套错误
+        options: Options(
+          connectTimeout: const Duration(seconds: 15), // 连接超时
+          receiveTimeout: const Duration(seconds: 30), // 等待 AI 回复超时
+        ),
       );
-      return {
-        "content": response.data['choices'][0]['message']['content'],
-        "source": source
-      };
+
+      // 成功获取 Python 返回的数据
+      if (response.statusCode == 200 && response.data != null) {
+        return {
+          "content": response.data['content'] ?? "后端未返回内容",
+          "source": response.data['source'] ?? "云端调度"
+        };
+      } else {
+        return {"content": "服务器忙，请稍后再试", "source": "网络拦截"};
+      }
     } catch (e) {
-      throw Exception("AI 调度中心请求失败: $e");
+      // 这里的报错处理非常关键，真机连不上时会显示具体的 IP 情况
+      String errorMsg = e.toString();
+      if (e is DioException) {
+        if (e.type == DioExceptionType.connectionTimeout) {
+          errorMsg = "连接超时：请确认电脑防火墙已关闭，且手机和电脑在同一 Wi-Fi。";
+        } else if (e.type == DioExceptionType.connectionError) {
+          errorMsg = "连接被拒绝：请确认 Python 后端已启动（python index.py）。";
+        }
+      }
+      return {
+        "content": "无法连接云端大脑\n地址：$_backendUrl\n详情：$errorMsg",
+        "source": "调度中心报错"
+      };
     }
   }
 }
