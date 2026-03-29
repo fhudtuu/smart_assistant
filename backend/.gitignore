@@ -1,0 +1,18 @@
+# Python 虚拟环境
+.venv/
+env/
+venv/
+ENV/
+
+# 缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 数据库文件（如果你不想把测试数据传上去）
+*.db
+*.sqlite3
+
+# 本地环境变量
+.env

@@ -1,45 +1,46 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# --- Flutter/Dart 相关 (保留并优化) ---
+/build/
 .dart_tool/
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
-/build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
+**/doc/api/
+/ios/Flutter/.last_build_id
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# --- Python 后端相关 (圆圆必加！) ---
+# 忽略虚拟环境文件夹（这是最占地方的）
+.venv/
+venv/
+env/
+bin/
+lib/
+include/
+/backend/.venv/
+
+# 忽略 Python 运行缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# --- 数据库与本地数据 ---
+# 如果你不希望把测试时的对话记录传上去，取消下面这行的注释
+# *.db
+
+# --- IDE 与系统文件 ---
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+
+# --- 杂项 ---
+*.log
+.history
