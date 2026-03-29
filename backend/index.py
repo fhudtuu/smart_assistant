@@ -72,5 +72,6 @@ def chat():
         return jsonify({"content": f"后端连接 DeepSeek 失败: {str(e)}", "source": "后端报错"})
 
 if __name__ == '__main__':
-    # 守住你的热点 IP 门牌号
+    # 暴力锁定：直接填入你查到的手机热点分配给电脑的 IP
+    # 这样 Flask 就会绕过 VPN 的虚拟网卡，专门守在热点这个“门口”
     app.run(host='192.168.81.221', port=5000, debug=True)

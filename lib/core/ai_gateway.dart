@@ -1,11 +1,13 @@
 // lib/core/ai_gateway.dart
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart'; // 导入以使用 debugPrint
+import 'package:smart_assistant/core/database/db_helper.dart';
 
 class AiGateway {
   final Dio _dio = Dio();
+  final DBHelper _db = DBHelper();
 
   // 【检查点】：确保这里的 IP 依然是你电脑的 IPv4 地址
-  // 端口 5000 对应 Python Flask 的默认端口
   final String _backendUrl = "http://192.168.81.221:5000/api/chat";
 
   Future<Map<String, String>> dispatchTask(String question, String systemPrompt) async {
@@ -17,24 +19,32 @@ class AiGateway {
           "question": question,
           "system_prompt": systemPrompt,
         },
-        // 这里的 options 放在 post 方法的参数里，修复了括号嵌套错误
         options: Options(
-          connectTimeout: const Duration(seconds: 15), // 连接超时
-          receiveTimeout: const Duration(seconds: 30), // 等待 AI 回复超时
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 30),
         ),
       );
 
       // 成功获取 Python 返回的数据
       if (response.statusCode == 200 && response.data != null) {
+        final String content = response.data['content'] ?? "后端未返回内容";
+        final String source = response.data['source'] ?? "云端调度";
+
+        // --- 核心逻辑：将对话持久化存入本地数据库 ---
+        // 这一步体现了你论文中“内核管理数据”的严谨性 [cite: 23]
+        await _db.saveMessage(question, content, source);
+        
+        // 修正点：使用 debugPrint 消除 avoid_print 警告
+        debugPrint(">>> 存档成功：已记录一条来自 [$source] 的对话");
+
         return {
-          "content": response.data['content'] ?? "后端未返回内容",
-          "source": response.data['source'] ?? "云端调度"
+          "content": content,
+          "source": source
         };
       } else {
         return {"content": "服务器忙，请稍后再试", "source": "网络拦截"};
       }
     } catch (e) {
-      // 这里的报错处理非常关键，真机连不上时会显示具体的 IP 情况
       String errorMsg = e.toString();
       if (e is DioException) {
         if (e.type == DioExceptionType.connectionTimeout) {
