@@ -2,107 +2,123 @@ import os
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 app = Flask(__name__)
-CORS(app) # 开启跨域支持
+CORS(app)
 
-# 【配置区】
-DEEPSEEK_KEY = "sk-028c375fb721407e9fd742422020fd9d"
-GAODE_KEY = "88ef6f0a034af78ee56fae50b060c855"
-API_URL = "https://api.deepseek.com/chat/completions"
-
-def get_real_traffic():
-    """高德 API 实时抓取：西湖断桥附近的交通态势"""
-    url = f"https://restapi.amap.com/v3/traffic/status/circle?location=120.15,30.27&radius=1500&key={GAODE_KEY}"
-    try:
-        res = requests.get(url, timeout=5)
-        data = res.json()
-        if data.get('status') == '1' and 'trafficinfo' in data:
-            info = data['trafficinfo']
-            status_desc = info.get('description', '路况平稳')
-            return f"【高德实时路况】{status_desc}。"
-        return "【高德提示】该区域暂无详细路况数据。"
-    except:
-        return "【高德提示】获取实时路况超时。"
-
-def get_smart_intent(question):
-    """【黑科技】：利用 AI 识别用户的语义意图"""
-    prompt = f"""
-    你是一个意图分类器。请分析用户的话，从以下三个分类中选择一个最合适的：
-    - commute: 询问路况、地点、导航、打车、出门、天气或交通。
-    - academic: 询问论文、摘要、翻译、专业知识、总结或学术格式。
-    - default: 闲聊、日常问候或其他通用问题。
-    
-    用户说的话: "{question}"
-    
-    只需回答分类 ID（commute/academic/default），不要回答任何其他文字。
-    """
-    try:
-        response = requests.post(
-            API_URL,
-            headers={"Authorization": f"Bearer {DEEPSEEK_KEY}"},
-            json={
-                "model": "deepseek-chat",
-                "messages": [{"role": "system", "content": "You are a classifier."}, {"role": "user", "content": prompt}],
-                "temperature": 0 # 识别意图需要极度准确
-            },
-            timeout=10
-        )
-        intent = response.json()['choices'][0]['message']['content'].strip().lower()
-        return intent if intent in ['commute', 'academic', 'default'] else 'default'
-    except:
-        return 'default'
+def get_model_config():
+    return {
+        "deepseek": {
+            "url": os.getenv("DEEPSEEK_URL"),
+            "key": os.getenv("DEEPSEEK_KEY"),
+            "model": "deepseek-chat"
+        },
+        "kimi": {
+            "url": os.getenv("KIMI_URL"),
+            "key": os.getenv("KIMI_KEY"),
+            "model": "moonshot-v1-8k"
+        },
+        "doubao": {
+            "url": "https://ark.cn-beijing.volces.com/api/v3/responses",
+            "key": os.getenv("DOUBAO_KEY"),
+            "model": "doubao-seed-2-0-pro-260215",
+        }
+    }
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
     data = request.json
-    question = data.get('question', '')
-    
-    # --- 1. 语义意图识别 ---
-    intent = get_smart_intent(question)
-    print(f">>> AI 识别到的意图为: {intent}")
+    question = data.get('question', '').strip()
+    image_data = data.get('image_data')
+    model = data.get('model', 'deepseek')
 
-    # --- 2. 根据意图动态调整身份和背景数据 ---
-    # 强制注入“小陆”身份，亲切称呼圆圆
-    system_prompt = "你叫小陆，是圆圆的专职智能助手。你要表现得非常贴心，一定要称呼用户为‘圆圆’。"
-    source_name = "智能内核"
+    # 有图片强制走豆包
+    if image_data:
+        model = "doubao"
 
-    if intent == "commute":
-        source_name = "小陆·通勤助手"
-        traffic_info = get_real_traffic()
-        system_prompt += f"\n当前是通勤模式。背景信息：{traffic_info}。请根据这个路况给圆圆温馨的出行建议。"
-    
-    elif intent == "academic":
-        source_name = "小陆·学术助理"
-        system_prompt += "\n当前是学术模式。请以专业、严谨且结构化的口吻协助圆圆处理学术任务。"
+    config = get_model_config()[model]
+    headers = {
+        "Authorization": f"Bearer {config['key']}",
+        "Content-Type": "application/json"
+    }
 
-    # --- 3. 正式向 DeepSeek 请求对话 ---
     try:
-        response = requests.post(
-            API_URL,
-            headers={"Authorization": f"Bearer {DEEPSEEK_KEY}"},
-            json={
-                "model": "deepseek-chat",
+        # 豆包 Seed 2.0 格式（看图）
+        if model == "doubao":
+            content = []
+            if image_data:
+                content.append({
+                    "type": "input_image",
+                    "image_url": f"data:image/png;base64,{image_data}"
+                })
+            content.append({
+                "type": "input_text",
+                "text": question if question else "描述这张图片"
+            })
+            payload = {
+                "model": config["model"],
+                "input": [{
+                    "role": "user",
+                    "content": content
+                }]
+            }
+        # 普通文本模型（DeepSeek / Kimi）
+        else:
+            payload = {
+                "model": config["model"],
                 "messages": [
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": "你叫小陆，是圆圆的贴心助手。"},
                     {"role": "user", "content": question}
-                ],
-                "temperature": 0.7
-            },
-            timeout=30
-        )
-        
-        result = response.json()
-        ai_content = result['choices'][0]['message']['content']
-        
+                ]
+            }
+
+        # 请求接口
+        resp = requests.post(config["url"], headers=headers, json=payload, timeout=90)
+        result = resp.json()
+
+        # 统一干净提取回答
+        answer = ""
+
+        # 豆包返回格式
+        if "output" in result:
+            for out in result["output"]:
+                if out.get("type") == "message":
+                    for c in out.get("content", []):
+                        if c.get("type") == "output_text":
+                            answer = c.get("text", "").strip()
+                            break
+                    break
+
+        # DeepSeek / Kimi 返回格式
+        elif "choices" in result and len(result["choices"]) > 0:
+            msg = result["choices"][0]["message"]
+            answer = msg.get("content", "").strip()
+
+        # 错误提示精简
+        if not answer:
+            err = result.get("error", {}).get("message", "服务暂时无法回复")
+            answer = f"提示：{err}"
+
+        # 只返回纯文字，APP显示最干净
         return jsonify({
-            "content": ai_content, 
-            "source": source_name
+            "content": answer,
+            "source": {
+                "deepseek": "DeepSeek",
+                "kimi": "Kimi",
+                "doubao": "豆包"
+            }.get(model, "AI")
         })
-        
+
     except Exception as e:
-        return jsonify({"content": f"对话请求失败: {str(e)}", "source": "后端报错"})
+        return jsonify({
+            "content": f"服务异常，请稍后再试",
+            "source": "系统"
+        })
 
 if __name__ == '__main__':
-    # 锁定你的热点 IP，穿透 VPN
-    app.run(host='192.168.81.221', port=5000, debug=True)
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.getenv("FLASK_PORT", 5000))
+    app.run(host=host, port=port, debug=False)
