@@ -37,7 +37,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = false; 
   bool _isPanelOpen = false; 
 
-  // --- 多模态暂存状态 ---
   File? _selectedFile;
   String? _selectedFileType;
 
@@ -47,7 +46,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadChatHistory();
   }
 
-  // 选取媒体（仅暂存预览，不立刻发送）
   Future<void> _onMediaTapped(String type) async {
     File? file;
     if (type == 'camera') file = await _mediaHandler.pickImage(ImageSource.camera);
@@ -64,48 +62,44 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 核心：支持文本 + 图片混合发送
   Future<void> askAI(String question) async {
     if (question.isEmpty && _selectedFile == null) return;
     
     String displayContent = question;
-    String? currentImagePath = _selectedFile?.path; // 获取本地路径
+    String? currentFilePath = _selectedFile?.path; 
 
-    // 如果只有图片没有文字，自动补全指令
     if (question.isEmpty && _selectedFile != null) {
-      displayContent = _selectedFileType == 'file' ? "请分析这个文档。" : "请分析这张图片。";
+      displayContent = _selectedFileType == 'file' ? "请排版或润色这个文档。" : "请分析这张图片。";
     }
 
     setState(() {
       _messages.add({
         "role": "user", 
         "content": displayContent,
-        "imagePath": currentImagePath ?? "" 
+        "imagePath": currentFilePath ?? "" 
       });
       _isLoading = true; 
       _isPanelOpen = false;
-      _selectedFile = null; // 发送后清除预览
+      _selectedFile = null; 
     });
     
     _controller.clear();
     _scrollToBottom(); 
 
     try {
-      // --- 发送给网关，触发 Base64 转码与后端路由 ---
       final result = await _gateway.dispatchTask(
         displayContent, 
         _currentPlugin?.systemPrompt ?? "你是一个助理。",
-        imagePath: currentImagePath, 
+        filePath: currentFilePath, 
       );
       
       if (!mounted) return;
 
-      // --- 关键解析：确保提取 result 中的 content 字段 ---
       setState(() {
         _messages.add({
           "role": "assistant", 
           "content": result['content'] ?? "后端未返回有效识别结果",
-          "imagePath": ""
+          "imagePath": result['file_path'] ?? ""  
         });
       });
     } catch (e) {
@@ -133,16 +127,17 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
+  // 🚨 核心修复：把延迟放到了外面，确保每次打开 APP 都能精准滑到底部！
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent, 
           duration: const Duration(milliseconds: 300), 
           curve: Curves.easeOut
         );
-      });
-    }
+      }
+    });
   }
 
   void _goToMarket() async {
@@ -166,7 +161,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             Text(_currentPlugin == null ? "智能助理" : _currentPlugin!.name, 
                 style: const TextStyle(color: Colors.black, fontSize: 16)),
-            const Text("多模态视觉增强版", style: TextStyle(color: Colors.grey, fontSize: 10)),
+            const Text("多模态视觉与文档增强版", style: TextStyle(color: Colors.grey, fontSize: 10)),
           ],
         ),
         actions: [
@@ -184,10 +179,13 @@ class _ChatScreenState extends State<ChatScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final msg = _messages[index];
-                return ChatBubble(
-                  content: msg["content"]!, 
-                  isUser: msg["role"] == "user",
-                  imagePath: msg["imagePath"], 
+                
+                return SelectionArea(
+                  child: ChatBubble(
+                    content: msg["content"]!, 
+                    isUser: msg["role"] == "user",
+                    imagePath: msg["imagePath"], 
+                  ),
                 );
               },
             ),
@@ -209,7 +207,6 @@ class _ChatScreenState extends State<ChatScreen> {
       child: SafeArea(
         child: Column(
           children: [
-            // --- 选图后的预览小窗 ---
             if (_selectedFile != null)
               Container(
                 padding: const EdgeInsets.all(8),
@@ -223,11 +220,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(_selectedFile!, width: 50, height: 50, fit: BoxFit.cover),
+                      child: _selectedFileType == 'file' 
+                          ? Container(
+                              width: 50, height: 50, color: Colors.blue[50], 
+                              child: const Icon(Icons.insert_drive_file, color: Colors.blue))
+                          : Image.file(_selectedFile!, width: 50, height: 50, fit: BoxFit.cover),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text("待发送图片已就绪...", style: TextStyle(fontSize: 13, color: Colors.teal)),
+                    Expanded(
+                      child: Text(
+                        _selectedFileType == 'file' ? "待发送文档已就绪..." : "待发送图片已就绪...", 
+                        style: const TextStyle(fontSize: 13, color: Colors.teal)
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.cancel_rounded, color: Colors.grey), 

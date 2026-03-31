@@ -1,140 +1,221 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:io';
+import 'dart:ui';
+import 'package:share_plus/share_plus.dart'; 
+import 'package:dio/dio.dart'; // 🚨 新增：用于下载网络文件
 
 class ChatBubble extends StatelessWidget {
   final String content;
   final bool isUser;
-  final String? imagePath;
+  final String? imagePath; 
 
   const ChatBubble({super.key, required this.content, required this.isUser, this.imagePath});
+
+  bool _isImage(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext);
+  }
+
+  /// 安全的 URI 解码函数：处理可能无效的百分比编码
+  String _safeUriDecode(String encoded) {
+    try {
+      return Uri.decodeComponent(encoded);
+    } catch (e) {
+      // 如果解码失败，直接返回原始字符串
+      return encoded;
+    }
+  }
+
+  // 🚨 终极改造：先从电脑端下载文件到手机，然后再分享
+  void _saveFileToDevice(BuildContext context, String fileUrl) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('⏳ 正在从服务器拉取文件...'), duration: Duration(seconds: 1)),
+      );
+
+      // 1. 获取手机的系统临时文件夹
+      final tempDir = Directory.systemTemp;
+      
+      // 2. 从 URL 中解析出中文文件名并安全解码
+      final rawFileName = fileUrl.split('/').last;
+      final fileName = _safeUriDecode(rawFileName);
+      final savePath = '${tempDir.path}/$fileName';
+
+      // 3. 下载文件到手机本地
+      await Dio().download(fileUrl, savePath);
+
+      // 4. 调用原生面板分享刚刚下载到手机上的文件
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(savePath)], 
+          text: '这是为您排版与润色好的文档。', 
+        )
+      );
+
+      if (result.status == ShareResultStatus.success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ 文件导出成功！', style: TextStyle(color: Colors.white)), 
+            backgroundColor: Colors.teal,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ 下载或处理失败: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end, 
         children: [
-          // AI 头像在左
           if (!isUser) _buildAvatar(false),
-          
-          const SizedBox(width: 8),
+          if (!isUser) const SizedBox(width: 10),
 
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                // 豆包深炭色：0xFF1E293B, 豆包浅灰色：0xFFF2F3F5
-                color: isUser ? const Color(0xFF1E293B) : const Color(0xFFF2F3F5),
-                borderRadius: _getBorderRadius(),
-                border: isUser 
-                    ? null 
-                    : Border.all(color: const Color(0xFFE5E6EB), width: 0.5),
-              ),
-              child: _buildContent(),
-            ),
+            child: isUser ? _buildUserBubble(context) : _buildAIBubble(context),
           ),
 
-          const SizedBox(width: 8),
-
-          // 用户头像在右
+          if (isUser) const SizedBox(width: 10),
           if (isUser) _buildAvatar(true),
         ],
       ),
     );
   }
 
-  // 核心：复刻豆包的不对称圆角（带指向性的小尾巴）
-  BorderRadius _getBorderRadius() {
-    const Radius standardRadius = Radius.circular(18);
-    const Radius sharpRadius = Radius.circular(4); // 尖角
-
-    if (isUser) {
-      return const BorderRadius.only(
-        topLeft: standardRadius,
-        topRight: standardRadius,
-        bottomLeft: standardRadius,
-        bottomRight: sharpRadius, // 指向用户头像
-      );
-    } else {
-      return const BorderRadius.only(
-        topLeft: standardRadius,
-        topRight: standardRadius,
-        bottomLeft: sharpRadius, // 指向 AI 头像
-        bottomRight: standardRadius,
-      );
-    }
+  Widget _buildUserBubble(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFF28C4A6), Color(0xFF0D92BA)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: [BoxShadow(color: const Color(0xFF0D92BA).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+        borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20), bottomLeft: Radius.circular(20), bottomRight: Radius.circular(4)),
+      ),
+      child: _buildContent(context),
+    );
   }
 
-  Widget _buildAvatar(bool isUserRole) {
+  Widget _buildAIBubble(BuildContext context) {
     return Container(
-      width: 32,
-      height: 32,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isUserRole ? Colors.blueGrey[100] : const Color(0xFF1E293B),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 5))],
+        borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20), bottomLeft: Radius.circular(4), bottomRight: Radius.circular(20)),
       ),
-      child: Center(
-        child: Icon(
-          isUserRole ? Icons.person : Icons.auto_awesome,
-          size: 18,
-          color: isUserRole ? Colors.blueGrey[700] : Colors.tealAccent,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20), bottomLeft: Radius.circular(4), bottomRight: Radius.circular(20)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12.0, sigmaY: 12.0), 
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.65), 
+              border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.2),
+            ),
+            child: _buildContent(context),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildAvatar(bool isUserRole) {
+    return Container(
+      width: 36, height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: isUserRole ? const LinearGradient(colors: [Color(0xFFE2E8F0), Color(0xFFF8FAFC)]) : const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]), 
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: Center(
+        child: Icon(isUserRole ? Icons.person_rounded : Icons.auto_awesome_rounded, size: 20, color: isUserRole ? const Color(0xFF475569) : Colors.tealAccent),
+      ),
+    );
+  }
+
+  Widget _buildMediaCard(BuildContext context) {
+    if (imagePath == null || imagePath!.isEmpty) return const SizedBox.shrink();
+
+    final bool isImg = _isImage(imagePath!);
+
+    return GestureDetector(
+      // 点击下载并呼出面板
+      onTap: (!isUser && !isImg) ? () => _saveFileToDevice(context, imagePath!) : null,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))]
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: isImg 
+              ? Image.file(File(imagePath!), width: 220, fit: BoxFit.cover)
+              : Container(
+                  width: 220,
+                  padding: const EdgeInsets.all(12),
+                  color: Colors.white, 
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+                        child: const Icon(Icons.description_rounded, color: Colors.blueAccent, size: 24),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          // 即使是 URL，也能正确显示出中文文件名（安全解码）
+                          _safeUriDecode(imagePath!.split('/').last),
+                          style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      ),
+                      if (!isUser)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8.0),
+                          child: Icon(Icons.ios_share_rounded, color: Colors.teal, size: 22),
+                        )
+                    ],
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     if (isUser) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (imagePath != null && imagePath!.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(File(imagePath!), width: 200, fit: BoxFit.cover),
-            ),
-          if (imagePath != null && imagePath!.isNotEmpty) const SizedBox(height: 8),
-          Text(
-            content,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15.5,
-              height: 1.4,
-              letterSpacing: 0.3,
-            ),
-          ),
+          _buildMediaCard(context),
+          Text(content, style: const TextStyle(color: Colors.white, fontSize: 15.5, height: 1.5, fontWeight: FontWeight.w500, letterSpacing: 0.3)),
         ],
       );
     } else {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (imagePath != null && imagePath!.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(File(imagePath!), width: 200, fit: BoxFit.cover),
-            ),
-          if (imagePath != null && imagePath!.isNotEmpty) const SizedBox(height: 8),
+          _buildMediaCard(context),
           MarkdownBody(
             data: content,
-            selectable: true,
             styleSheet: MarkdownStyleSheet(
-              p: const TextStyle(color: Color(0xFF1D2129), fontSize: 15.5, height: 1.6),
-              strong: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0052CC)),
-              code: TextStyle(
-                backgroundColor: const Color(0xFFE5E6EB),
-                color: const Color(0xFFD91D39),
-                fontSize: 14,
-                fontFamily: 'monospace',
-              ),
-              codeblockDecoration: BoxDecoration(
-                color: const Color(0xFF272A31),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              listBullet: const TextStyle(color: Color(0xFF0052CC), fontSize: 16),
+              p: const TextStyle(color: Color(0xFF1E293B), fontSize: 15.5, height: 1.6),
+              strong: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              code: TextStyle(backgroundColor: Colors.black.withValues(alpha: 0.05), color: const Color(0xFFE11D48), fontSize: 14, fontFamily: 'monospace'),
+              codeblockDecoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
+              listBullet: const TextStyle(color: Color(0xFF28C4A6), fontSize: 16),
             ),
           ),
         ],

@@ -18,6 +18,7 @@ class PluginManager {
     final List<String> manifests = [
       'lib/plugins/commute/manifest.json',
       // 'lib/plugins/academic/manifest.json', // 预留后续学术插件路径
+      'lib/plugins/document_assistant/manifest.json', // 新增这一行
     ];
 
     for (String path in manifests) {
