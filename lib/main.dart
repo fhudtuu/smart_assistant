@@ -86,33 +86,24 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
     _scrollToBottom(); 
 
-    try {
-      final result = await _gateway.dispatchTask(
-        displayContent, 
-        _currentPlugin?.systemPrompt ?? "你是一个助理。",
-        filePath: currentFilePath, 
-      );
-      
-      if (!mounted) return;
+    // 统一走智能分发
+    final aiResp = await _gateway.smartDispatchTask(question, filePath: currentFilePath);
 
-      setState(() {
-        _messages.add({
-          "role": "assistant", 
-          "content": result['content'] ?? "后端未返回有效识别结果",
-          "imagePath": result['file_path'] ?? ""  
-        });
+    setState(() {
+      _isLoading = false;
+      // 🚨 核心修复：把 file_path 传给 ChatBubble，这样才能显示文件下载卡片！
+      _messages.add({
+        "role": "ai", 
+        "content": aiResp["content"] ?? "(无返回)", 
+        "imagePath": aiResp["file_path"] ?? ""  // ✅ 从 file_path 改为 imagePath
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { 
-        _messages.add({"role": "assistant", "content": "调度异常: $e", "imagePath": ""}); 
-      });
-    } finally {
-      if (mounted) { 
-        setState(() => _isLoading = false); 
-        _scrollToBottom(); 
-      }
-    }
+      _selectedFile = null;
+      _selectedFileType = null;
+    });
+
+    // 存历史
+    await _db.saveMessage(displayContent, aiResp["content"] ?? "(无返回)", aiResp["source"] ?? "AI");
+    _scrollToBottom();
   }
 
   Future<void> _loadChatHistory() async {

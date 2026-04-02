@@ -10,7 +10,7 @@ class AiGateway {
   
   // 🚨 导师提醒：如果一会运行还是报超时，请务必在电脑的 cmd 里输入 ipconfig 检查 IPv4 地址
   // 如果你的电脑 IP 变了，一定要把下面这行的 192.168.81.221 换成最新的 IP！
-  final String _backendUrl = "http://192.168.81.221:5000/api/chat";
+  final String _backendUrl = "http://192.168.139.221:5000/api/chat";
   
   // 重试配置
   static const int _maxRetries = 3;
@@ -23,6 +23,48 @@ class AiGateway {
     debugPrint("    1️⃣  后端是否启动：python backend/index.py");
     debugPrint("    2️⃣  电脑 IP 是否正确：在 cmd 中运行 ipconfig，查看 IPv4 地址");
     debugPrint("    3️⃣  手机/模拟器是否与电脑在同一网络");
+  }
+
+  /// 智能分发：DeepSeek为总指挥官，先识别意图再分发
+  Future<Map<String, String>> smartDispatchTask(String question, {String? filePath}) async {
+    // 1. 先让 DeepSeek 识别意图
+    final intentResult = await _intentRecognize(question, filePath: filePath);
+    final String target = intentResult['target'] ?? 'deepseek';
+    final String finalPrompt = intentResult['final_prompt'] ?? question;
+    debugPrint('DeepSeek分发决策: $target, prompt: $finalPrompt');
+
+    // 2. 根据 target 决定分发
+    if (target == 'doubao') {
+      return await dispatchTask(finalPrompt, "你是多模态视觉专家，擅长图片理解。", filePath: filePath, model: 'doubao');
+    } else if (target == 'kimi') {
+      return await dispatchTask(finalPrompt, "你是文档处理专家，擅长长文档分析与润色。", filePath: filePath, model: 'kimi');
+    } else {
+      return await dispatchTask(finalPrompt, "你是通用AI助手。", filePath: filePath, model: 'deepseek');
+    }
+  }
+
+  /// DeepSeek意图识别，返回 {target, reason, final_prompt}
+  Future<Map<String, dynamic>> _intentRecognize(String question, {String? filePath}) async {
+    String systemPrompt = '''你是一个智能助手的总指挥官。请根据用户输入内容和文件类型，判断应该由哪个AI负责处理，并返回如下JSON：\n{\n  "target": "deepseek|doubao|kimi",\n  "reason": "分发理由",\n  "final_prompt": "给下属AI的最终prompt"\n}\n规则：\n- 如果是图片/多模态任务，target填doubao\n- 如果是文档处理/润色/排版，target填kimi\n- 其他通用对话、知识问答、推理等，target填deepseek\n- 只返回JSON，不要多余解释。''';
+    String userInput = question;
+    if (filePath != null && filePath.isNotEmpty) {
+      final ext = filePath.split('.').last.toLowerCase();
+      userInput += "\n(文件类型: .$ext)";
+    }
+    try {
+      final resp = await dispatchTask(userInput, systemPrompt, model: 'deepseek');
+      final content = resp['content'] ?? '';
+      final start = content.indexOf('{');
+      final end = content.lastIndexOf('}');
+      if (start != -1 && end != -1 && end > start) {
+        final jsonStr = content.substring(start, end + 1);
+        return json.decode(jsonStr);
+      }
+    } catch (e) {
+      debugPrint('意图识别异常: $e');
+    }
+    // 兜底
+    return {"target": "deepseek", "reason": "兜底", "final_prompt": question};
   }
 
   /// 调度任务
@@ -47,13 +89,13 @@ class AiGateway {
         if (filePath != null && filePath.isNotEmpty) {
           final File file = File(filePath);
           if (await file.exists()) {
-            String extension = filePath.split('.').last.toLowerCase();
-
-            if (['png', 'jpg', 'jpeg'].contains(extension)) {
-              List<int> bytes = await file.readAsBytes();
-              base64Image = base64Encode(bytes);
+            final extension = filePath.split('.').last.toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) {
               useModel = "doubao";
               debugPrint(">>> 🖼️ 检测到图片，自动切换为豆包视觉");
+              // 转 Base64 处理
+              final bytes = await file.readAsBytes();
+              base64Image = base64Encode(bytes);
             } else if (['doc', 'docx'].contains(extension)) {
               isDocument = true;
               useModel = "kimi";

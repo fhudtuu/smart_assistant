@@ -9,7 +9,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, RGBColor
 
 load_dotenv(override=True)
 
@@ -46,10 +46,41 @@ def process_document_with_agent(filepath, original_filename, question, system_pr
     {{"target_text": "需要被替换的原句子", "new_text": "润色后的新句子"}}
   ],
   "format_tasks": [
-    {{"target": "body_text", "font_name": "SimSun", "font_size": 14}}
+    {{"target": "body_text", "font_name": "SimSun", "font_size": 14, "bold": false, "italic": false, "underline": false, "color": "black"}},
+    {{"target": "text:特定文本", "font_size": 16, "bold": true, "color": "red"}}
   ]
 }}
-注：如果没有对应的任务，数组保留为空即可。如果用户要求改字体，font_name 填英文字体名（如黑体为 SimHei，宋体为 SimSun）。
+
+📋 format_tasks 字段说明：
+- target: 修改对象
+  * "body_text" = 修改整个文档的所有文本
+  * "text:具体文本内容" = 只修改特定的文本（例如 "text:第一段" 只修改"第一段"这个文本）
+- font_name: 字体名称（必填）
+  * SimSun = 宋体
+  * SimHei = 黑体
+  * Arial = 英文Arial字体
+  * Courier New = 等宽字体
+  * Comic Sans = 手写体
+- font_size: 数字，字体大小（如 12、14、16、20）
+- bold: true=加粗，false=不加粗
+- italic: true=斜体，false=不斜体
+- underline: true=下划线，false=无下划线
+- color: 字体颜色，可用值包括：
+  * black（黑色）、red（红色）、blue（蓝色）、green（绿色）
+  * yellow（黄色）、orange（橙色）、purple（紫色）、brown（棕色）
+  * gray/grey（灰色）、white（白色）、pink（粉色）、cyan（青色）
+  * magenta（品红）、lime（青绿）、navy（深蓝）、teal（深青）、olive（橄榄绿）
+
+📌 重要指南：
+1. 用户要求「把第二段改成红色加粗」时，你应该返回：
+   {{"target": "text:第二段", "color": "red", "bold": true, "font_name": "SimHei", "font_size": 14}}
+
+2. 用户要求「把整个文档改成黑体12号」时，返回：
+   {{"target": "body_text", "font_name": "SimHei", "font_size": 12}}
+
+3. 如果图片中的用户指令没有提及字体，保持原样（不填相关字段）
+4. 如果用户没有要求修改格式，format_tasks 可以为空数组 []
+5. 重点：所有布尔值（bold、italic、underline）必须是 true 或 false，不能是 1/0 或 yes/no
 """
 
         payload = {
@@ -82,17 +113,99 @@ def process_document_with_agent(filepath, original_filename, question, system_pr
             if old_text and new_text:
                 for p in doc.paragraphs:
                     if old_text in p.text:
-                        p.text = p.text.replace(old_text, new_text)
+                        # 🚨 核心修复：使用 replace_text 确保格式正确应用
+                        for run in p.runs:
+                            if old_text in run.text:
+                                run.text = run.text.replace(old_text, new_text)
 
         for task in instructions.get("format_tasks", []):
             target = task.get("target")
             font_name = task.get("font_name")
             font_size = task.get("font_size")
+            bold = task.get("bold", False)
+            italic = task.get("italic", False)
+            underline = task.get("underline", False)
+            color = task.get("color", "black")
+            
+            # 🚨 颜色映射表：支持常见的中文和英文颜色名称
+            color_map = {
+                "black": (0, 0, 0),
+                "red": (255, 0, 0),
+                "blue": (0, 0, 255),
+                "green": (0, 128, 0),
+                "yellow": (255, 255, 0),
+                "orange": (255, 165, 0),
+                "purple": (128, 0, 128),
+                "brown": (165, 42, 42),
+                "gray": (128, 128, 128),
+                "grey": (128, 128, 128),
+                "white": (255, 255, 255),
+                "pink": (255, 192, 203),
+                "cyan": (0, 255, 255),
+                "magenta": (255, 0, 255),
+                "lime": (0, 255, 0),
+                "navy": (0, 0, 128),
+                "teal": (0, 128, 128),
+                "olive": (128, 128, 0),
+            }
+            
+            print(f"📝 应用格式: target={target}, font={font_name}, size={font_size}, bold={bold}, color={color}")
+            
             if target == "body_text":
+                # 遍历所有段落和run，应用格式
                 for p in doc.paragraphs:
                     for run in p.runs:
-                        if font_name: run.font.name = font_name
-                        if font_size: run.font.size = Pt(font_size)
+                        # 应用字体名称
+                        if font_name:
+                            run.font.name = font_name
+                            run.font.ascii_theme_color = None  # 清除主题颜色以使用自定义颜色
+                        
+                        # 应用字体大小
+                        if font_size:
+                            run.font.size = Pt(font_size)
+                        
+                        # 应用加粗
+                        if bold:
+                            run.font.bold = True
+                        
+                        # 应用斜体
+                        if italic:
+                            run.font.italic = True
+                        
+                        # 应用下划线
+                        if underline:
+                            run.font.underline = True
+                        
+                        # 应用颜色（这是关键！）
+                        if color and color.lower() in color_map:
+                            rgb = color_map[color.lower()]
+                            run.font.color.rgb = RGBColor(*rgb)
+                            print(f"✅ 颜色已应用: {color} = RGB{rgb}")
+            
+            # 支持特定文本的格式修改
+            elif target and target.startswith("text:"):
+                target_text = target.replace("text:", "").strip()
+                print(f"🔍 寻找特定文本: {target_text}")
+                
+                for p in doc.paragraphs:
+                    for run in p.runs:
+                        if target_text in run.text:
+                            if font_name:
+                                run.font.name = font_name
+                            if font_size:
+                                run.font.size = Pt(font_size)
+                            if bold:
+                                run.font.bold = True
+                            if italic:
+                                run.font.italic = True
+                            if underline:
+                                run.font.underline = True
+                            if color and color.lower() in color_map:
+                                rgb = color_map[color.lower()]
+                                run.font.color.rgb = RGBColor(*rgb)
+                            print(f"✅ 文本格式已应用: {target_text}")
+
+        print("🎉 文档格式处理完成！")
 
         timestamp = int(time.time())
         output_filename = f"修改后_{timestamp}_{original_filename}"
@@ -188,4 +301,20 @@ def download_file(filename):
 if __name__ == '__main__':
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_PORT", 5000))
+    
+    # 🚨 核心修复：打印出实际的访问地址
+    print("\n" + "="*60)
+    print("✅ 后端服务已启动！")
+    print("="*60)
+    print(f"📡 监听地址: {host}:{port}")
+    print(f"🌐 Flutter 访问地址: http://192.168.139.221:{port}/api/chat")
+    print("="*60)
+    print("💡 提示：确保你的代码中 _backendUrl 也设置为:")
+    print("   http://192.168.139.221:5000/api/chat")
+    print("\n⚠️  如果连接失败，请检查：")
+    print("   1. 手机/模拟器是否与电脑在同一网络")
+    print("   2. 防火墙是否允许 5000 端口")
+    print("   3. IP地址是否正确（在 cmd 中运行 ipconfig 查看 IPv4地址）")
+    print("="*60 + "\n")
+    
     app.run(host=host, port=port, debug=False)
