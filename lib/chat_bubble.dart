@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:io';
 import 'dart:ui';
-import 'package:share_plus/share_plus.dart'; 
-import 'package:dio/dio.dart'; // 🚨 新增：用于下载网络文件
+import 'package:share_plus/share_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChatBubble extends StatelessWidget {
   final String content;
@@ -15,6 +17,56 @@ class ChatBubble extends StatelessWidget {
   bool _isImage(String path) {
     final ext = path.split('.').last.toLowerCase();
     return ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext);
+  }
+
+  /// 跳���到地图：优先高德 App，其次百度 App，最后才降级到网页版
+  Future<void> _openMap() async {
+    // 高德 App 路径规划页（带参数更容易唤起）
+    const String amapUrl = 'iosamap://path?sourceApplication=smart_assistant&dname=我的目的地';
+    const String amapAndroidUrl = 'amapuri://route/plan/?sourceApplication=smart_assistant&dname=我的目的地';
+
+    // 百度 App 路径规划页（带参数更容易唤起）
+    const String bdmapUrl = 'baidumap://map/direction?origin=&destination=我的目的地&mode=driving&src=smart_assistant';
+
+    const String gaoDeWeb = 'https://www.amap.com';
+    const String bdmapWeb = 'https://map.baidu.com';
+
+    // 1. 尝试高德 App（Android 和 iOS 用不同 scheme）
+    try {
+      final uri = Uri.parse(amapAndroidUrl);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (launched) return;
+    } catch (_) {}
+
+    try {
+      final uri = Uri.parse(amapUrl);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (launched) return;
+    } catch (_) {}
+
+    // 2. 尝试百度 App
+    try {
+      final bdmapUri = Uri.parse(bdmapUrl);
+      final launched = await launchUrl(bdmapUri, mode: LaunchMode.externalApplication);
+      if (launched) return;
+    } catch (_) {}
+
+    // 3. 都没有 App 才降级到网页版，优先高德网页
+    try {
+      final webUri = Uri.parse(gaoDeWeb);
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
+
+    // 4. 高德网页也不行，再用百度网页
+    try {
+      final bdwebUri = Uri.parse(bdmapWeb);
+      if (await canLaunchUrl(bdwebUri)) {
+        await launchUrl(bdwebUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
   }
 
   /// 安全的 URI 解码函数：处理可能无效的百分比编码
@@ -195,30 +247,70 @@ class ChatBubble extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
+    // 统一的复制回调
+    void copyText() {
+      Clipboard.setData(ClipboardData(text: content));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ 已复制到剪贴板', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.teal,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+
     if (isUser) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          _buildMediaCard(context),
-          Text(content, style: const TextStyle(color: Colors.white, fontSize: 15.5, height: 1.5, fontWeight: FontWeight.w500, letterSpacing: 0.3)),
-        ],
+      return GestureDetector(
+        onLongPress: copyText,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _buildMediaCard(context),
+            Text(content, style: const TextStyle(color: Colors.white, fontSize: 15.5, height: 1.5, fontWeight: FontWeight.w500, letterSpacing: 0.3)),
+          ],
+        ),
       );
     } else {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildMediaCard(context),
-          MarkdownBody(
-            data: content,
-            styleSheet: MarkdownStyleSheet(
-              p: const TextStyle(color: Color(0xFF1E293B), fontSize: 15.5, height: 1.6),
-              strong: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-              code: TextStyle(backgroundColor: Colors.black.withValues(alpha: 0.05), color: const Color(0xFFE11D48), fontSize: 14, fontFamily: 'monospace'),
-              codeblockDecoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
-              listBullet: const TextStyle(color: Color(0xFF28C4A6), fontSize: 16),
+      return GestureDetector(
+        onLongPress: copyText,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildMediaCard(context),
+            MarkdownBody(
+              data: content,
+              styleSheet: MarkdownStyleSheet(
+                p: const TextStyle(color: Color(0xFF1E293B), fontSize: 15.5, height: 1.6),
+                strong: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                code: TextStyle(backgroundColor: Colors.black.withValues(alpha: 0.05), color: const Color(0xFFE11D48), fontSize: 14, fontFamily: 'monospace'),
+                codeblockDecoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
+                listBullet: const TextStyle(color: Color(0xFF28C4A6), fontSize: 16),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            // AI 消息下方显示通勤助手图标，点击跳转地图
+            GestureDetector(
+              onTap: _openMap,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.map, color: Colors.teal, size: 16),
+                    SizedBox(width: 4),
+                    Text('通勤助手', style: TextStyle(color: Colors.teal, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
   }

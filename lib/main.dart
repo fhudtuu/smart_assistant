@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'core/ai_gateway.dart';      
+import 'core/ai_gateway.dart';
 import 'plugins/base_plugin.dart';
-import 'chat_bubble.dart'; 
-import 'core/plugin_manager.dart'; 
-import 'core/database/db_helper.dart'; 
+import 'chat_bubble.dart';
+import 'core/plugin_manager.dart';
+import 'core/database/db_helper.dart';
 import 'pages/plugin_market_page.dart';
 import 'core/media_handler.dart';
 

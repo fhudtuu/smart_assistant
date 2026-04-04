@@ -10,7 +10,7 @@ class AiGateway {
   
   // 🚨 导师提醒：如果一会运行还是报超时，请务必在电脑的 cmd 里输入 ipconfig 检查 IPv4 地址
   // 如果你的电脑 IP 变了，一定要把下面这行的 192.168.81.221 换成最新的 IP！
-  final String _backendUrl = "http://192.168.139.221:5000/api/chat";
+  final String _backendUrl = "http://192.168.2.6:5000/api/chat";
   
   // 重试配置
   static const int _maxRetries = 3;

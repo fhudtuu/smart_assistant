@@ -211,10 +211,12 @@ def process_document_with_agent(filepath, original_filename, question, system_pr
         output_filename = f"修改后_{timestamp}_{original_filename}"
         output_path = os.path.join(OUTPUT_FOLDER, output_filename)
         doc.save(output_path)
-        
-        # 🚨 核心修复：对带有中文的文件名进行 URL 编码，防止 Flutter 解析崩溃！
+
+        # 🚨 核心修复：用固定 IP 而非 request.host，避免手机端拿到无效地址
+        server_ip = os.getenv("SERVER_IP", "192.168.139.221")
+        server_port = os.getenv("FLASK_PORT", "5000")
         encoded_filename = urllib.parse.quote(output_filename)
-        file_url = f"http://{request.host}/api/download/{encoded_filename}"
+        file_url = f"http://{server_ip}:{server_port}/api/download/{encoded_filename}"
 
         return jsonify({
             "content": "✅ 文档已智能排版与润色完毕！\n请点击下方文件卡片导出至手机。",
@@ -301,20 +303,20 @@ def download_file(filename):
 if __name__ == '__main__':
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_PORT", 5000))
-    
-    # 🚨 核心修复：打印出实际的访问地址
+    server_ip = os.getenv("SERVER_IP", "192.168.139.221")
+
     print("\n" + "="*60)
     print("✅ 后端服务已启动！")
     print("="*60)
     print(f"📡 监听地址: {host}:{port}")
-    print(f"🌐 Flutter 访问地址: http://192.168.139.221:{port}/api/chat")
+    print(f"🌐 Flutter 访问地址: http://{server_ip}:{port}/api/chat")
     print("="*60)
-    print("💡 提示：确保你的代码中 _backendUrl 也设置为:")
-    print("   http://192.168.139.221:5000/api/chat")
+    print("💡 提示：确保你的 Flutter 代码中 _backendUrl 也设置为:")
+    print(f"   http://{server_ip}:{port}/api/chat")
     print("\n⚠️  如果连接失败，请检查：")
     print("   1. 手机/模拟器是否与电脑在同一网络")
     print("   2. 防火墙是否允许 5000 端口")
     print("   3. IP地址是否正确（在 cmd 中运行 ipconfig 查看 IPv4地址）")
     print("="*60 + "\n")
-    
+
     app.run(host=host, port=port, debug=False)
