@@ -10,9 +10,10 @@ import 'package:url_launcher/url_launcher.dart';
 class ChatBubble extends StatelessWidget {
   final String content;
   final bool isUser;
-  final String? imagePath; 
+  final String? imagePath;
+  final String? source;
 
-  const ChatBubble({super.key, required this.content, required this.isUser, this.imagePath});
+  const ChatBubble({super.key, required this.content, required this.isUser, this.imagePath, this.source});
 
   bool _isImage(String path) {
     final ext = path.split('.').last.toLowerCase();
@@ -289,26 +290,28 @@ class ChatBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // AI 消息下方显示通勤助手图标，点击跳转地图
-            GestureDetector(
-              onTap: _openMap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.map, color: Colors.teal, size: 16),
-                    SizedBox(width: 4),
-                    Text('通勤助手', style: TextStyle(color: Colors.teal, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ],
+            // 只有 source 为"通勤助手"时才显示跳转按钮
+            if (source == '通勤助手') ...[
+              GestureDetector(
+                onTap: _openMap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.map, color: Colors.teal, size: 16),
+                      SizedBox(width: 4),
+                      Text('通勤助手', style: TextStyle(color: Colors.teal, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       );

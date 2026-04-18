@@ -7,11 +7,35 @@ import urllib.parse # 🚨 新增：用于 URL 转码
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
+from commute_helper import is_commute_request, commute_helper
+from datasheet_rag import datasheet_rag
+from paper_helper import (
+    generate_outline, polish_text, rewrite_text,
+    format_references, check_format, get_template,
+    generate_outline_document, generate_polish_document,
+    generate_references_document
+)
 
 from docx import Document
 from docx.shared import Pt, RGBColor
 
-load_dotenv(override=True)
+# 🚨 重要修复：手动加载环境变量（避免 dotenv 编码问题）
+try:
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+        print(f"[MAIN] 环境变量已手动加载")
+    else:
+        print(f"[MAIN] .env 文件不存在: {env_path}")
+        load_dotenv(override=True)
+except Exception as e:
+    print(f"[MAIN] 环境变量加载失败: {e}")
+    load_dotenv(override=True)
 
 app = Flask(__name__)
 CORS(app)
@@ -231,6 +255,8 @@ def process_document_with_agent(filepath, original_filename, question, system_pr
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    # 意图识别阶段跳过插件路由，避免污染识别结果
+    skip_plugin_routing = request.args.get('skip_plugin') == '1'
     if request.content_type and 'multipart/form-data' in request.content_type:
         data = request.form
         question = data.get('question', '').strip()
@@ -259,7 +285,106 @@ def chat():
         model = data.get('model', 'deepseek')
         system_prompt = data.get('system_prompt', '你叫小陆，是圆圆的贴心助手。')
 
+        # Commute assistant routing（意图识别阶段跳过，避免误判）
+        if not skip_plugin_routing and is_commute_request(question):
+            return jsonify(commute_helper.handle_request(question))
+
+        # ============ 论文/数据手册自动导出（意图识别阶段也执行）============
+        # 论文助手意图识别
+        paper_keywords = ['论文', '大纲', '开题报告', '毕业设计', '毕业论文']
+        paper_export_keywords = ['导出', '输出', '生成文档', '生成word', '生成md', '下载', 'word格式', 'markdown格式', 'md格式', 'docx', '文档']
+        is_paper_request = any(kw in question for kw in paper_keywords)
+        is_paper_export = any(kw in question.lower() for kw in paper_export_keywords)
+
+        if is_paper_request:
+            print(f"[PAPER] 论文请求: topic='{question}'")
+            # 提取主题（去掉关键词）
+            topic = question
+            for kw in ['论文', '大纲', '开题报告', '毕业设计', '毕业论文', '导出', '输出', '生成文档', '生成word', '生成md', '下载', 'word格式', 'markdown格式', 'md格式', 'docx']:
+                topic = topic.replace(kw, '').replace(kw.upper(), '').replace(kw.capitalize(), '')
+            topic = topic.strip()
+
+            fmt = 'md' if 'md' in question.lower() or 'markdown' in question.lower() else 'docx'
+            server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+            server_port = os.getenv("FLASK_PORT", "5000")
+
+            # 1. 先调用 AI 生成大纲（论文助手核心）
+            ai_answer = ""
+            if topic:
+                ai_result = generate_outline(topic, 'general')
+                ai_answer = ai_result.get("content", "")
+                print(f"[PAPER] AI生成完成，字符数: {len(ai_answer)}")
+
+            # 2. 如果需要导出文档，生成文档（Word/Markdown）
+            file_url = None
+            if is_paper_export and topic:
+                doc_result = generate_outline_document(topic, 'general', fmt)
+                filepath = doc_result.get("filepath", "")
+                if filepath and os.path.exists(filepath):
+                    filename = os.path.basename(filepath)
+                    file_url = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+                    print(f"[PAPER] 文档已生成: {filepath}")
+
+            # 3. 同时返回消息内容和文件下载链接
+            resp_content = ""
+            if ai_answer and not ai_answer.startswith("错误：") and not ai_answer.startswith("请求失败"):
+                resp_content = ai_answer
+            elif topic:
+                resp_content = f"正在为您生成关于「{topic}」的论文大纲...\n\n（文档生成中，请稍候）"
+
+            if file_url:
+                fmt_name = "Word文档(.docx)" if fmt == 'docx' else "Markdown(.md)"
+                resp_content += f"\n\n📄 {fmt_name}已生成！点击下方卡片下载文件："
+
+            return jsonify({
+                "content": resp_content,
+                "source": "论文助手",
+                "file_url": file_url,
+                "file_path": file_url,
+            })
+
+        # 数据手册助手意图识别（嵌入式/芯片相关）
+        datasheet_keywords = ['数据手册', 'datasheet', '芯片', '单片机', 'stm32', 'esp32', 'gpio', '寄存器', '嵌入式']
+        datasheet_export_keywords = ['导出', '输出', '生成文档', '生成word', '生成md', '下载', 'word格式', 'markdown格式', 'md格式', 'docx', '文档']
+        is_datasheet_request = any(kw in question.lower() for kw in datasheet_keywords)
+        is_datasheet_export = any(kw in question.lower() for kw in datasheet_export_keywords)
+
+        if is_datasheet_request:
+            print(f"[DATASHEET] 数据手册请求: question='{question}'")
+            fmt = 'md' if 'md' in question.lower() or 'markdown' in question.lower() else 'docx'
+            server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+            server_port = os.getenv("FLASK_PORT", "5000")
+
+            # 1. 先调用 RAG 回答问题（数据手册核心）
+            rag_result = datasheet_rag.ask(question)
+            rag_answer = rag_result.get("content", "")
+            print(f"[DATASHEET] RAG回答完成，字符数: {len(rag_answer)}")
+
+            # 2. 如果需要导出文档，生成文档
+            file_url = None
+            if is_datasheet_export:
+                doc_result = datasheet_rag.export_to_document(question, rag_answer, fmt)
+                filepath = doc_result.get("filepath", "")
+                if filepath and os.path.exists(filepath):
+                    filename = os.path.basename(filepath)
+                    file_url = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+                    print(f"[DATASHEET] 文档已生成: {filepath}")
+
+            # 3. 同时返回消息内容和文件下载链接
+            resp_content = rag_answer
+            if file_url:
+                fmt_name = "Word文档(.docx)" if fmt == 'docx' else "Markdown(.md)"
+                resp_content += f"\n\n📄 {fmt_name}已生成！点击下方卡片下载文件："
+
+            return jsonify({
+                "content": resp_content,
+                "source": "数据手册助手",
+                "file_url": file_url,
+                "file_path": file_url,
+            })
+
         if image_data: model = "doubao"
+        if not model: model = 'deepseek'
         config = get_model_config()[model]
         headers = {"Authorization": f"Bearer {config['key']}", "Content-Type": "application/json"}
 
@@ -298,25 +423,338 @@ def chat():
 # 🚨 新增：让手机能够下载文件的专属接口
 @app.route('/api/download/<path:filename>', methods=['GET'])
 def download_file(filename):
-    return send_from_directory(OUTPUT_FOLDER, filename, as_attachment=True)
+    # 按顺序在多个输出目录中查找文件
+    for folder in [OUTPUT_FOLDER, 'paper_outputs', 'datasheet_outputs']:
+        path = os.path.join(folder, filename)
+        if os.path.exists(path):
+            return send_from_directory(folder, filename, as_attachment=True)
+    return jsonify({"error": "文件不存在"}), 404
+
+# ============ 数据手册 RAG 接口 ============
+DATASHEET_FOLDER = 'datasheets'
+
+@app.route('/api/datasheet/upload', methods=['POST'])
+def datasheet_upload():
+    """上传并解析数据手册PDF"""
+    try:
+        if 'document' not in request.files:
+            return jsonify({"content": "未接收到文件", "source": "错误"}), 400
+
+        file = request.files['document']
+        if not file.filename.endswith('.pdf'):
+            return jsonify({"content": "只支持PDF文件", "source": "错误"}), 400
+
+        # 保存文件
+        safe_filename = f"upload_{int(time.time())}_{file.filename}"
+        filepath = os.path.join(DATASHEET_FOLDER, safe_filename)
+        os.makedirs(DATASHEET_FOLDER, exist_ok=True)
+        file.save(filepath)
+
+        # 加载并索引文档
+        result = datasheet_rag.load_document(filepath)
+
+        return jsonify({
+            "content": f"数据手册解析完成！\n\n文件名：{result['filename']}\n切分段落：{result['chunks']}块\n芯片型号：{result['metadata'].get('chip_name', '未知')}",
+            "source": "数据手册助手",
+            "filename": result['filename'],
+            "chunks": result['chunks']
+        })
+
+    except Exception as e:
+        return jsonify({"content": f"处理失败：{str(e)}", "source": "错误"}), 500
+
+@app.route('/api/datasheet/ask', methods=['POST'])
+def datasheet_ask():
+    """问答接口"""
+    try:
+        data = request.json
+        question = data.get('question', '').strip()
+
+        if not question:
+            return jsonify({"content": "请输入问题", "source": "错误"}), 400
+
+        # 调用RAG引擎回答
+        result = datasheet_rag.ask(question)
+
+        # 自动检测导出意图
+        export_keywords = ['导出', '输出', '生成文档', '生成word', '生成md', '下载']
+        need_export = any(kw in question.lower() for kw in export_keywords)
+
+        if need_export and result.get('content'):
+            # 自动生成文档并返回下载链接
+            fmt = 'md' if 'md' in question.lower() or 'markdown' in question.lower() else 'docx'
+            doc_result = datasheet_rag.export_to_document(question, result['content'], fmt)
+            server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+            server_port = os.getenv("FLASK_PORT", "5000")
+            filepath = doc_result.get("filepath", "")
+            if filepath and os.path.exists(filepath):
+                filename = os.path.basename(filepath)
+                doc_result["file_url"] = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+                result["file_url"] = doc_result["file_url"]
+                result["content"] = f"{result['content']}\n\n📄 文档已自动生成！点击下方链接下载：\n{doc_result['file_url']}"
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"content": f"处理失败：{str(e)}", "source": "错误"}), 500
+
+@app.route('/api/datasheet/status', methods=['GET'])
+def datasheet_status():
+    """获取当前加载的文档状态"""
+    return jsonify({
+        "has_document": datasheet_rag.current_file is not None,
+        "filename": datasheet_rag.current_file,
+        "chunks": len(datasheet_rag.documents)
+    })
 
 if __name__ == '__main__':
+    import sys
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_PORT", 5000))
-    server_ip = os.getenv("SERVER_IP", "192.168.139.221")
+    server_ip = os.getenv("SERVER_IP", "192.168.2.6")
 
-    print("\n" + "="*60)
-    print("✅ 后端服务已启动！")
-    print("="*60)
-    print(f"📡 监听地址: {host}:{port}")
-    print(f"🌐 Flutter 访问地址: http://{server_ip}:{port}/api/chat")
-    print("="*60)
-    print("💡 提示：确保你的 Flutter 代码中 _backendUrl 也设置为:")
-    print(f"   http://{server_ip}:{port}/api/chat")
-    print("\n⚠️  如果连接失败，请检查：")
-    print("   1. 手机/模拟器是否与电脑在同一网络")
-    print("   2. 防火墙是否允许 5000 端口")
-    print("   3. IP地址是否正确（在 cmd 中运行 ipconfig 查看 IPv4地址）")
-    print("="*60 + "\n")
+    print("\n" + "=" * 60)
+    print("Backend service started successfully!")
+    print("=" * 60)
+    print(f"Listen address: {host}:{port}")
+    print(f"Flutter access URL: http://{server_ip}:{port}/api/chat")
+    print("=" * 60 + "\n")
 
     app.run(host=host, port=port, debug=False)
+
+
+# ============ 论文助手接口 ============
+PAPER_FOLDER = 'paper_uploads'
+os.makedirs(PAPER_FOLDER, exist_ok=True)
+
+@app.route('/api/paper/outline', methods=['POST'])
+def paper_outline():
+    """生成论文大纲"""
+    try:
+        data = request.json
+        topic = data.get('topic', '').strip()
+        discipline = data.get('discipline', 'general')
+
+        if not topic:
+            return jsonify({"content": "请输入论文主题", "source": "论文助手"})
+
+        result = generate_outline(topic, discipline)
+
+        # 自动检测导出意图
+        export_keywords = ['导出', '输出', '生成文档', '生成word', '生成md', '下载']
+        need_export = any(kw in topic.lower() for kw in export_keywords)
+
+        if need_export:
+            # 自动生成文档并返回下载链接
+            fmt = 'md' if 'md' in topic.lower() or 'markdown' in topic.lower() else 'docx'
+            doc_result = generate_outline_document(topic, discipline, fmt)
+            server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+            server_port = os.getenv("FLASK_PORT", "5000")
+            filepath = doc_result.get("filepath", "")
+            if filepath and os.path.exists(filepath):
+                filename = os.path.basename(filepath)
+                doc_result["file_url"] = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+                result["file_url"] = doc_result["file_url"]
+                result["content"] = f"{result['content']}\n\n📄 文档已自动生成！点击下方链接下载：\n{doc_result['file_url']}"
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"生成失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/polish', methods=['POST'])
+def paper_polish():
+    """润色文本"""
+    try:
+        data = request.json
+        text = data.get('text', '').strip()
+
+        if not text:
+            return jsonify({"content": "请输入要润色的文本", "source": "论文助手"})
+
+        result = polish_text(text)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"润色失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/rewrite', methods=['POST'])
+def paper_rewrite():
+    """降重改写"""
+    try:
+        data = request.json
+        text = data.get('text', '').strip()
+
+        if not text:
+            return jsonify({"content": "请输入要改写的文本", "source": "论文助手"})
+
+        result = rewrite_text(text)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"改写失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/references', methods=['POST'])
+def paper_references():
+    """格式化参考文献"""
+    try:
+        data = request.json
+        text = data.get('text', '').strip()
+        format_type = data.get('format', 'gb')
+
+        if not text:
+            return jsonify({"content": "请输入文献信息", "source": "论文助手"})
+
+        result = format_references(text, format_type)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"格式化失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/check-format', methods=['POST'])
+def paper_check_format():
+    """检查论文格式"""
+    try:
+        if 'document' not in request.files:
+            # 无文档时返回检查清单
+            result = check_format()
+            return jsonify(result)
+
+        file = request.files['document']
+        # 保存文件
+        safe_filename = f"upload_{int(time.time())}_{file.filename}"
+        filepath = os.path.join(PAPER_FOLDER, safe_filename)
+        file.save(filepath)
+
+        result = check_format(filepath)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"检查失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/template', methods=['GET'])
+def paper_template():
+    """获取写作模板"""
+    try:
+        template_type = request.args.get('type', 'outline')
+        result = get_template(template_type)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"获取模板失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/export-outline', methods=['POST'])
+def paper_export_outline():
+    """导出大纲为文档"""
+    try:
+        data = request.json
+        topic = data.get('topic', '').strip()
+        discipline = data.get('discipline', 'general')
+        fmt = data.get('format', 'docx')
+
+        if not topic:
+            return jsonify({"content": "请输入论文主题", "source": "论文助手"})
+
+        result = generate_outline_document(topic, discipline, fmt)
+        # 返回文件下载地址
+        server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+        server_port = os.getenv("FLASK_PORT", "5000")
+        filepath = result.get("filepath", "")
+        if filepath and os.path.exists(filepath):
+            filename = os.path.basename(filepath)
+            result["file_url"] = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"导出失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/export-polish', methods=['POST'])
+def paper_export_polish():
+    """导出润色结果为文档"""
+    try:
+        data = request.json
+        original = data.get('original', '').strip()
+        polished = data.get('polished', '').strip()
+        fmt = data.get('format', 'docx')
+
+        if not original or not polished:
+            return jsonify({"content": "请先生成润色结果", "source": "论文助手"})
+
+        result = generate_polish_document(original, polished, fmt)
+        server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+        server_port = os.getenv("FLASK_PORT", "5000")
+        filepath = result.get("filepath", "")
+        if filepath and os.path.exists(filepath):
+            filename = os.path.basename(filepath)
+            result["file_url"] = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"导出失败：{str(e)}", "source": "论文助手"})
+
+
+@app.route('/api/paper/export-references', methods=['POST'])
+def paper_export_references():
+    """导出参考文献为文档"""
+    try:
+        data = request.json
+        refs = data.get('refs', '').strip()
+        fmt_type = data.get('format', 'gb')
+
+        if not refs:
+            return jsonify({"content": "请先生成参考文献", "source": "论文助手"})
+
+        result = generate_references_document(refs, fmt_type)
+        server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+        server_port = os.getenv("FLASK_PORT", "5000")
+        filepath = result.get("filepath", "")
+        if filepath and os.path.exists(filepath):
+            filename = os.path.basename(filepath)
+            result["file_url"] = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"导出失败：{str(e)}", "source": "论文助手"})
+
+
+# ============ 数据手册导出接口 ============
+@app.route('/api/datasheet/export-qa', methods=['POST'])
+def datasheet_export_qa():
+    """导出当前问答为文档"""
+    try:
+        data = request.json
+        question = data.get('question', '').strip()
+        answer = data.get('answer', '').strip()
+        fmt = data.get('format', 'docx')
+
+        if not question or not answer:
+            return jsonify({"content": "没有可导出的问答内容", "source": "错误"})
+
+        result = datasheet_rag.export_to_document(question, answer, fmt)
+        server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+        server_port = os.getenv("FLASK_PORT", "5000")
+        filepath = result.get("filepath", "")
+        if filepath and os.path.exists(filepath):
+            filename = os.path.basename(filepath)
+            result["file_url"] = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"导出失败：{str(e)}", "source": "错误"})
+
+
+@app.route('/api/datasheet/export-full', methods=['POST'])
+def datasheet_export_full():
+    """导出完整数据手册为文档"""
+    try:
+        fmt = request.args.get('format', 'docx')
+        result = datasheet_rag.export_full_specs(fmt)
+        server_ip = os.getenv("SERVER_IP", "192.168.2.6")
+        server_port = os.getenv("FLASK_PORT", "5000")
+        filepath = result.get("filepath", "")
+        if filepath and os.path.exists(filepath):
+            filename = os.path.basename(filepath)
+            result["file_url"] = f"http://{server_ip}:{server_port}/api/download/{urllib.parse.quote(filename)}"
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"content": f"导出失败：{str(e)}", "source": "错误"})

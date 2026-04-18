@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shared_preferences: ^2.2.0  # 确保有这一行
 
   cupertino_icons: ^1.0.8
   dio: ^5.9.2
@@ -25,6 +26,7 @@ dependencies:
   webview_flutter: ^4.10.0
   geolocator: ^13.0.2
   url_launcher: ^6.3.1
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -36,10 +38,11 @@ flutter:
 
   # 关键修改：注册资源文件
   assets:
-    # 注册通勤助手的插件配置文件
+    # 注册插件配置文件
     - lib/plugins/commute/manifest.json
-    - lib/plugins/document_assistant/manifest.json # 新增这一行
-    # 如果后续有 .env 文件也建议注册
-    # - .env 
+    - lib/plugins/document_assistant/manifest.json
+    - lib/plugins/datasheet_assistant/manifest.json
+    - lib/plugins/paper_assistant/manifest.json
+    # - .env
 
   # 如果你以后要加自定义字体，可以在下方继续添加

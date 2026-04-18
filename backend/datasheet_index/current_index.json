@@ -1,0 +1,315 @@
+{
+  "current_file": "LM358_test.pdf",
+  "documents": [
+    {
+      "id": "STM32F4_test.pdf_0",
+      "content": "STM32F4xx Microcontroller Datasheet\n1. PRODUCT OVERVIEW\n            The STM32F405xx and STM32F407xx are based on the high-performance\n            ARM Cortex-M4 32-bit RISC core operating at a frequency of up to 168 MHz.",
+      "metadata": {
+        "chip_name": "STM32F4xx",
+        "category": "Unknown",
+        "specs": {
+          "frequency": "168",
+          "resolution": "32"
+        }
+      },
+      "chunk_index": 0,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_1",
+      "content": "1. PRODUCT OVERVIEW\n            The STM32F405xx and STM32F407xx are based on the high-performance\n            ARM Cortex-M4 32-bit RISC core operating at a frequency of up to 168 MHz.\n2. FEATURES\n            - Core: ARM Cortex-M4 with FPU, up to 168 MHz\n            - Flash: Up to 1 MB\n            - SRAM: Up to 192 KB\n            - ADC: 12-bit, 16 channels, up to 2.4 MSPS\n            - DAC: 12-bit, 2 channels\n            - Timers: Up to 14 timers\n            - Communication: USART, SPI, I2C, CAN, USB OTG\n            - Operating Voltage: 1.8V to 3.6V\n            - Operating Temperature: -40°C to 85°C",
+      "metadata": {
+        "chip_name": "STM32F405xx",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "1.8",
+          "frequency": "168",
+          "resolution": "32"
+        }
+      },
+      "chunk_index": 1,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_2",
+      "content": "2. FEATURES\n            - Core: ARM Cortex-M4 with FPU, up to 168 MHz\n            - Flash: Up to 1 MB\n            - SRAM: Up to 192 KB\n            - ADC: 12-bit, 16 channels, up to 2.4 MSPS\n            - DAC: 12-bit, 2 channels\n            - Timers: Up to 14 timers\n            - Communication: USART, SPI, I2C, CAN, USB OTG\n            - Operating Voltage: 1.8V to 3.6V\n            - Operating Temperature: -40°C to 85°C\n3. PIN DEFINITIONS\n            VDD: Power supply (1.8V-3.6V)\n            VSS: Ground\n            PA0-PA15: Port A pins\n            PB0-PB15: Port B pins\n            PC0-PC15: Port C pins\n            VDDA: Analog supply\n            VSSA: Analog ground\n            BOOT0: Boot selection\n            NRST: Reset pin (active low)",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "1.8",
+          "frequency": "168",
+          "resolution": "12"
+        }
+      },
+      "chunk_index": 2,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_3",
+      "content": "3. PIN DEFINITIONS\n            VDD: Power supply (1.8V-3.6V)\n            VSS: Ground\n            PA0-PA15: Port A pins\n            PB0-PB15: Port B pins\n            PC0-PC15: Port C pins\n            VDDA: Analog supply\n            VSSA: Analog ground\n            BOOT0: Boot selection\n            NRST: Reset pin (active low)\n4. ADC SPECIFICATIONS\n            Resolution: 12-bit (0-4095)\n            Sampling Rate: Up to 2.4 MSPS\n            Input Channels: 16 external + 2 internal\n            Reference Voltage: VREF+ (typically 3.3V)\n            Conversion Time: 12 cycles for 12-bit",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "1.8",
+          "resolution": "12"
+        }
+      },
+      "chunk_index": 3,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_4",
+      "content": "4. ADC SPECIFICATIONS\n            Resolution: 12-bit (0-4095)\n            Sampling Rate: Up to 2.4 MSPS\n            Input Channels: 16 external + 2 internal\n            Reference Voltage: VREF+ (typically 3.3V)\n            Conversion Time: 12 cycles for 12-bit\n5. GPIO SPECIFICATIONS\n            Output Current: 25 mA per pin (max)\n            Total Current: 120 mA per port (max)\n            Input Voltage: -0.3V to VDD+0.3V\n            Pull-up/Pull-down: 40 kΩ typical",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "3.3",
+          "current": "25",
+          "resolution": "12"
+        }
+      },
+      "chunk_index": 4,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_5",
+      "content": "5. GPIO SPECIFICATIONS\n            Output Current: 25 mA per pin (max)\n            Total Current: 120 mA per port (max)\n            Input Voltage: -0.3V to VDD+0.3V\n            Pull-up/Pull-down: 40 kΩ typical\n6. I2C SPECIFICATIONS\n            Speed: Standard (100 kHz), Fast (400 kHz)\n            Address: 7-bit or 10-bit\n            Noise Filter: Built-in 50ns filter\n            Clock Stretching: Supported",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "0.3",
+          "current": "25",
+          "resolution": "7"
+        }
+      },
+      "chunk_index": 5,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_6",
+      "content": "6. I2C SPECIFICATIONS\n            Speed: Standard (100 kHz), Fast (400 kHz)\n            Address: 7-bit or 10-bit\n            Noise Filter: Built-in 50ns filter\n            Clock Stretching: Supported\n7. UART SPECIFICATIONS\n            Baud Rate: Up to 10.5 Mbps\n            Data Bits: 8 or 9\n            Stop Bits: 1 or 2\n            Parity: None, Even, Odd\n            Flow Control: RTS/CTS optional",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "resolution": "7"
+        }
+      },
+      "chunk_index": 6,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_7",
+      "content": "7. UART SPECIFICATIONS\n            Baud Rate: Up to 10.5 Mbps\n            Data Bits: 8 or 9\n            Stop Bits: 1 or 2\n            Parity: None, Even, Odd\n            Flow Control: RTS/CTS optional\n8. POWER CONSUMPTION\n            Run Mode: 100 mA @ 168 MHz\n            Sleep Mode: 30 mA\n            Stop Mode: 100 μA\n            Standby Mode: 2 μA",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "frequency": "168",
+          "current": "100"
+        }
+      },
+      "chunk_index": 7,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_8",
+      "content": "8. POWER CONSUMPTION\n            Run Mode: 100 mA @ 168 MHz\n            Sleep Mode: 30 mA\n            Stop Mode: 100 μA\n            Standby Mode: 2 μA\n9. MEMORY MAP\n            0x08000000 - 0x08100000: Flash (1 MB)\n            0x20000000 - 0x20030000: SRAM (192 KB)\n            0x40020000 - 0x40020400: APB1 Peripherals\n            0x40010000 - 0x40010400: APB2 Peripherals",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "frequency": "168",
+          "current": "100"
+        }
+      },
+      "chunk_index": 8,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "STM32F4_test.pdf_9",
+      "content": "9. MEMORY MAP\n            0x08000000 - 0x08100000: Flash (1 MB)\n            0x20000000 - 0x20030000: SRAM (192 KB)\n            0x40020000 - 0x40020400: APB1 Peripherals\n            0x40010000 - 0x40010400: APB2 Peripherals\n10. CLOCK CONFIGURATION\n            HSI: 16 MHz internal RC\n            HSE: 4-26 MHz external crystal\n            PLL: Up to 168 MHz output",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "frequency": "16"
+        }
+      },
+      "chunk_index": 9,
+      "source": "STM32F4_test.pdf"
+    },
+    {
+      "id": "ESP32_test.pdf_0",
+      "content": "ESP32-WROOM-32 Datasheet\n1. OVERVIEW\n            The ESP32 is a low-power system on a chip microcontrollers\n            with integrated Wi-Fi and dual-mode Bluetooth.\n2. SPECIFICATIONS\n            Processor: Dual-core Xtensa LX6, up to 240 MHz\n            SRAM: 520 KB\n            Flash: 4 MB (external)\n            WiFi: 802.11 b/g/n\n            Bluetooth: BLE 4.2\n            GPIO: 34 pins\n            Operating Voltage: 2.2V to 3.6V\n            Operating Temperature: -40°C to 85°C",
+      "metadata": {
+        "chip_name": "ESP32-WROOM-32",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "2.2",
+          "frequency": "240"
+        }
+      },
+      "chunk_index": 0,
+      "source": "ESP32_test.pdf"
+    },
+    {
+      "id": "ESP32_test.pdf_1",
+      "content": "2. SPECIFICATIONS\n            Processor: Dual-core Xtensa LX6, up to 240 MHz\n            SRAM: 520 KB\n            Flash: 4 MB (external)\n            WiFi: 802.11 b/g/n\n            Bluetooth: BLE 4.2\n            GPIO: 34 pins\n            Operating Voltage: 2.2V to 3.6V\n            Operating Temperature: -40°C to 85°C\n3. POWER SPECIFICATIONS\n            Supply Voltage: 3.3V\n            Current Consumption:\n            - WiFi TX: 240 mA (peak)\n            - WiFi RX: 95 mA\n            - Bluetooth TX: 130 mA\n            - Light Sleep: 0.8 mA\n            - Deep Sleep: 10 μA",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "2.2",
+          "frequency": "240",
+          "current": "240"
+        }
+      },
+      "chunk_index": 1,
+      "source": "ESP32_test.pdf"
+    },
+    {
+      "id": "ESP32_test.pdf_2",
+      "content": "3. POWER SPECIFICATIONS\n            Supply Voltage: 3.3V\n            Current Consumption:\n            - WiFi TX: 240 mA (peak)\n            - WiFi RX: 95 mA\n            - Bluetooth TX: 130 mA\n            - Light Sleep: 0.8 mA\n            - Deep Sleep: 10 μA\n4. GPIO SPECIFICATIONS\n            Number of GPIOs: 34\n            Output Current: 40 mA (max per pin)\n            Total Current: 400 mA (VDD pins)\n            Input Voltage: 0V to 3.3V (5V tolerant with strap)\n            Pull-up/Pull-down: 45 kΩ typical",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "3.3",
+          "current": "240"
+        }
+      },
+      "chunk_index": 2,
+      "source": "ESP32_test.pdf"
+    },
+    {
+      "id": "ESP32_test.pdf_3",
+      "content": "4. GPIO SPECIFICATIONS\n            Number of GPIOs: 34\n            Output Current: 40 mA (max per pin)\n            Total Current: 400 mA (VDD pins)\n            Input Voltage: 0V to 3.3V (5V tolerant with strap)\n            Pull-up/Pull-down: 45 kΩ typical\n5. WiFi SPECIFICATIONS\n            Standard: 802.11 b/g/n\n            Frequency: 2.4 GHz\n            Channels: 13 (CN), 11 (US)\n            TX Power: +20 dBm (max)\n            RX Sensitivity: -98 dBm",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "0",
+          "current": "40"
+        }
+      },
+      "chunk_index": 3,
+      "source": "ESP32_test.pdf"
+    },
+    {
+      "id": "ESP32_test.pdf_4",
+      "content": "5. WiFi SPECIFICATIONS\n            Standard: 802.11 b/g/n\n            Frequency: 2.4 GHz\n            Channels: 13 (CN), 11 (US)\n            TX Power: +20 dBm (max)\n            RX Sensitivity: -98 dBm\n6. BLUETOOTH SPECIFICATIONS\n            Version: BLE 4.2\n            Frequency: 2.4 GHz\n            TX Power: +12 dBm (max)\n            RX Sensitivity: -97 dBm",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 4,
+      "source": "ESP32_test.pdf"
+    },
+    {
+      "id": "ESP32_test.pdf_5",
+      "content": "6. BLUETOOTH SPECIFICATIONS\n            Version: BLE 4.2\n            Frequency: 2.4 GHz\n            TX Power: +12 dBm (max)\n            RX Sensitivity: -97 dBm\n7. ADC SPECIFICATIONS\n            Channels: 18 (2 at 1.8V, 16 at 3.3V)\n            Resolution: 12-bit\n            Sampling Rate: Up to 2 MSPS\n            Reference: VDD (3.3V)\n            Accuracy: ±1%\n8. DAC SPECIFICATIONS\n            Channels: 2\n            Resolution: 8-bit\n            Output Range: 0 to VDD",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "1.8",
+          "resolution": "12"
+        }
+      },
+      "chunk_index": 5,
+      "source": "ESP32_test.pdf"
+    },
+    {
+      "id": "ESP32_test.pdf_6",
+      "content": "8. DAC SPECIFICATIONS\n            Channels: 2\n            Resolution: 8-bit\n            Output Range: 0 to VDD\n9. I2C SPECIFICATIONS\n            Speed: Up to 400 kHz\n            Address Range: 0x00-0x7F\n            pins: GPIO21 (SDA), GPIO22 (SCL)\n10. SPI SPECIFICATIONS\n            Max Speed: 80 MHz\n            CS Pins: 6\n            Data Width: 1-32 bits\n            Mode: 0-3",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "frequency": "80",
+          "resolution": "8"
+        }
+      },
+      "chunk_index": 6,
+      "source": "ESP32_test.pdf"
+    },
+    {
+      "id": "LM358_test.pdf_0",
+      "content": "LM358 Dual Operational Amplifier Datasheet\n1. DESCRIPTION\n            The LM358 consists of two independent, high-gain,\n            internal frequency-compensated operational amplifiers.\n2. ABSOLUTE MAXIMUM RATINGS\n            Supply Voltage: 32V (single), ±16V (dual)\n            Differential Input Voltage: 32V\n            Input Voltage: -0.3V to 32V\n            Output Short-Circuit Duration: Indefinite\n            Power Dissipation: 830 mW",
+      "metadata": {
+        "chip_name": "LM358",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "32"
+        }
+      },
+      "chunk_index": 0,
+      "source": "LM358_test.pdf"
+    },
+    {
+      "id": "LM358_test.pdf_1",
+      "content": "2. ABSOLUTE MAXIMUM RATINGS\n            Supply Voltage: 32V (single), ±16V (dual)\n            Differential Input Voltage: 32V\n            Input Voltage: -0.3V to 32V\n            Output Short-Circuit Duration: Indefinite\n            Power Dissipation: 830 mW\n3. ELECTRICAL CHARACTERISTICS\n            Supply Voltage: 3V to 32V (single)\n            Quiescent Current: 500 μA (typical)\n            Input Bias Current: 45 nA (typical)\n            Input Offset Voltage: 3 mV (max)\n            Input Offset Current: 5 nA (max)",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "32"
+        }
+      },
+      "chunk_index": 1,
+      "source": "LM358_test.pdf"
+    },
+    {
+      "id": "LM358_test.pdf_2",
+      "content": "3. ELECTRICAL CHARACTERISTICS\n            Supply Voltage: 3V to 32V (single)\n            Quiescent Current: 500 μA (typical)\n            Input Bias Current: 45 nA (typical)\n            Input Offset Voltage: 3 mV (max)\n            Input Offset Current: 5 nA (max)\n4. PERFORMANCE\n            Open-Loop Gain: 100 dB (typical)\n            Gain-Bandwidth Product: 700 kHz\n            Slew Rate: 0.3 V/μs\n            Input Impedance: 1 MΩ\n            Output Impedance: 100 Ω",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "3"
+        }
+      },
+      "chunk_index": 2,
+      "source": "LM358_test.pdf"
+    },
+    {
+      "id": "LM358_test.pdf_3",
+      "content": "4. PERFORMANCE\n            Open-Loop Gain: 100 dB (typical)\n            Gain-Bandwidth Product: 700 kHz\n            Slew Rate: 0.3 V/μs\n            Input Impedance: 1 MΩ\n            Output Impedance: 100 Ω\n5. PIN CONFIGURATION\n            Pin 1: Output A\n            Pin 2: Inverting Input A (-)\n            Pin 3: Non-inverting Input A (+)\n            Pin 4: VCC (Ground for single supply)\n            Pin 5: Non-inverting Input B (+)\n            Pin 6: Inverting Input B (-)\n            Pin 7: Output B\n            Pin 8: VCC+ (Positive supply)",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 3,
+      "source": "LM358_test.pdf"
+    },
+    {
+      "id": "LM358_test.pdf_4",
+      "content": "5. PIN CONFIGURATION\n            Pin 1: Output A\n            Pin 2: Inverting Input A (-)\n            Pin 3: Non-inverting Input A (+)\n            Pin 4: VCC (Ground for single supply)\n            Pin 5: Non-inverting Input B (+)\n            Pin 6: Inverting Input B (-)\n            Pin 7: Output B\n            Pin 8: VCC+ (Positive supply)\n6. APPLICATIONS\n            - Signal conditioning\n            - Active filters\n            - Buffers\n            - Comparators\n            - Voltage followers\n            - Summing amplifiers",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 4,
+      "source": "LM358_test.pdf"
+    },
+    {
+      "id": "LM358_test.pdf_5",
+      "content": "6. APPLICATIONS\n            - Signal conditioning\n            - Active filters\n            - Buffers\n            - Comparators\n            - Voltage followers\n            - Summing amplifiers\n7. TYPICAL CIRCUITS\n            Non-inverting Amplifier: Gain = 1 + Rf/Rg\n            Inverting Amplifier: Gain = -Rf/Rg\n            Voltage Follower: Gain = 1",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 5,
+      "source": "LM358_test.pdf"
+    }
+  ]
+}

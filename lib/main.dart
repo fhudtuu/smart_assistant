@@ -4,17 +4,17 @@ import 'package:image_picker/image_picker.dart';
 import 'core/ai_gateway.dart';
 import 'plugins/base_plugin.dart';
 import 'chat_bubble.dart';
-import 'core/plugin_manager.dart';
 import 'core/database/db_helper.dart';
 import 'pages/plugin_market_page.dart';
 import 'core/media_handler.dart';
+import 'core/plugin_market/plugin_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await PluginManager.loadPlugins();
+  await PluginStore().initialize();
   runApp(const MaterialApp(
     home: ChatScreen(),
-    debugShowCheckedModeBanner: false, 
+    debugShowCheckedModeBanner: false,
   ));
 }
 
@@ -95,7 +95,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.add({
         "role": "ai", 
         "content": aiResp["content"] ?? "(无返回)", 
-        "imagePath": aiResp["file_path"] ?? ""  // ✅ 从 file_path 改为 imagePath
+        "imagePath": aiResp["file_path"] ?? "",
+        "source": aiResp["source"] ?? "",
       });
       _selectedFile = null;
       _selectedFileType = null;
@@ -173,9 +174,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 
                 return SelectionArea(
                   child: ChatBubble(
-                    content: msg["content"]!, 
+                    content: msg["content"]!,
                     isUser: msg["role"] == "user",
-                    imagePath: msg["imagePath"], 
+                    imagePath: msg["imagePath"],
+                    source: msg["source"],
                   ),
                 );
               },
@@ -263,9 +265,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _FeatureIcon(Icons.camera_alt, "拍照", () => _onMediaTapped('camera')),
-                      _FeatureIcon(Icons.image, "相册", () => _onMediaTapped('gallery')),
-                      _FeatureIcon(Icons.folder_shared, "文件", () => _onMediaTapped('file')),
+                      Flexible(child: _FeatureIcon(Icons.camera_alt, "拍照", () => _onMediaTapped('camera'))),
+                      Flexible(child: _FeatureIcon(Icons.image, "相册", () => _onMediaTapped('gallery'))),
+                      Flexible(child: _FeatureIcon(Icons.folder_shared, "文件", () => _onMediaTapped('file'))),
                     ],
                   )
                 : const SizedBox.shrink(),

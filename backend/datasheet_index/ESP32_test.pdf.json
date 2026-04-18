@@ -1,0 +1,93 @@
+{
+  "documents": [
+    {
+      "id": "ESP32_test.pdf_0",
+      "content": "ESP32-WROOM-32 Datasheet\n1. OVERVIEW\n            The ESP32 is a low-power system on a chip microcontrollers\n            with integrated Wi-Fi and dual-mode Bluetooth.\n2. SPECIFICATIONS\n            Processor: Dual-core Xtensa LX6, up to 240 MHz\n            SRAM: 520 KB\n            Flash: 4 MB (external)\n            WiFi: 802.11 b/g/n\n            Bluetooth: BLE 4.2\n            GPIO: 34 pins\n            Operating Voltage: 2.2V to 3.6V\n            Operating Temperature: -40°C to 85°C",
+      "metadata": {
+        "chip_name": "ESP32-WROOM-32",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "2.2",
+          "frequency": "240"
+        }
+      },
+      "chunk_index": 0
+    },
+    {
+      "id": "ESP32_test.pdf_1",
+      "content": "2. SPECIFICATIONS\n            Processor: Dual-core Xtensa LX6, up to 240 MHz\n            SRAM: 520 KB\n            Flash: 4 MB (external)\n            WiFi: 802.11 b/g/n\n            Bluetooth: BLE 4.2\n            GPIO: 34 pins\n            Operating Voltage: 2.2V to 3.6V\n            Operating Temperature: -40°C to 85°C\n3. POWER SPECIFICATIONS\n            Supply Voltage: 3.3V\n            Current Consumption:\n            - WiFi TX: 240 mA (peak)\n            - WiFi RX: 95 mA\n            - Bluetooth TX: 130 mA\n            - Light Sleep: 0.8 mA\n            - Deep Sleep: 10 μA",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "2.2",
+          "frequency": "240",
+          "current": "240"
+        }
+      },
+      "chunk_index": 1
+    },
+    {
+      "id": "ESP32_test.pdf_2",
+      "content": "3. POWER SPECIFICATIONS\n            Supply Voltage: 3.3V\n            Current Consumption:\n            - WiFi TX: 240 mA (peak)\n            - WiFi RX: 95 mA\n            - Bluetooth TX: 130 mA\n            - Light Sleep: 0.8 mA\n            - Deep Sleep: 10 μA\n4. GPIO SPECIFICATIONS\n            Number of GPIOs: 34\n            Output Current: 40 mA (max per pin)\n            Total Current: 400 mA (VDD pins)\n            Input Voltage: 0V to 3.3V (5V tolerant with strap)\n            Pull-up/Pull-down: 45 kΩ typical",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "3.3",
+          "current": "240"
+        }
+      },
+      "chunk_index": 2
+    },
+    {
+      "id": "ESP32_test.pdf_3",
+      "content": "4. GPIO SPECIFICATIONS\n            Number of GPIOs: 34\n            Output Current: 40 mA (max per pin)\n            Total Current: 400 mA (VDD pins)\n            Input Voltage: 0V to 3.3V (5V tolerant with strap)\n            Pull-up/Pull-down: 45 kΩ typical\n5. WiFi SPECIFICATIONS\n            Standard: 802.11 b/g/n\n            Frequency: 2.4 GHz\n            Channels: 13 (CN), 11 (US)\n            TX Power: +20 dBm (max)\n            RX Sensitivity: -98 dBm",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "0",
+          "current": "40"
+        }
+      },
+      "chunk_index": 3
+    },
+    {
+      "id": "ESP32_test.pdf_4",
+      "content": "5. WiFi SPECIFICATIONS\n            Standard: 802.11 b/g/n\n            Frequency: 2.4 GHz\n            Channels: 13 (CN), 11 (US)\n            TX Power: +20 dBm (max)\n            RX Sensitivity: -98 dBm\n6. BLUETOOTH SPECIFICATIONS\n            Version: BLE 4.2\n            Frequency: 2.4 GHz\n            TX Power: +12 dBm (max)\n            RX Sensitivity: -97 dBm",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 4
+    },
+    {
+      "id": "ESP32_test.pdf_5",
+      "content": "6. BLUETOOTH SPECIFICATIONS\n            Version: BLE 4.2\n            Frequency: 2.4 GHz\n            TX Power: +12 dBm (max)\n            RX Sensitivity: -97 dBm\n7. ADC SPECIFICATIONS\n            Channels: 18 (2 at 1.8V, 16 at 3.3V)\n            Resolution: 12-bit\n            Sampling Rate: Up to 2 MSPS\n            Reference: VDD (3.3V)\n            Accuracy: ±1%\n8. DAC SPECIFICATIONS\n            Channels: 2\n            Resolution: 8-bit\n            Output Range: 0 to VDD",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "1.8",
+          "resolution": "12"
+        }
+      },
+      "chunk_index": 5
+    },
+    {
+      "id": "ESP32_test.pdf_6",
+      "content": "8. DAC SPECIFICATIONS\n            Channels: 2\n            Resolution: 8-bit\n            Output Range: 0 to VDD\n9. I2C SPECIFICATIONS\n            Speed: Up to 400 kHz\n            Address Range: 0x00-0x7F\n            pins: GPIO21 (SDA), GPIO22 (SCL)\n10. SPI SPECIFICATIONS\n            Max Speed: 80 MHz\n            CS Pins: 6\n            Data Width: 1-32 bits\n            Mode: 0-3",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "frequency": "80",
+          "resolution": "8"
+        }
+      },
+      "chunk_index": 6
+    }
+  ]
+}

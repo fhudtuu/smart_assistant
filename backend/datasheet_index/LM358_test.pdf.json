@@ -1,0 +1,70 @@
+{
+  "documents": [
+    {
+      "id": "LM358_test.pdf_0",
+      "content": "LM358 Dual Operational Amplifier Datasheet\n1. DESCRIPTION\n            The LM358 consists of two independent, high-gain,\n            internal frequency-compensated operational amplifiers.\n2. ABSOLUTE MAXIMUM RATINGS\n            Supply Voltage: 32V (single), ±16V (dual)\n            Differential Input Voltage: 32V\n            Input Voltage: -0.3V to 32V\n            Output Short-Circuit Duration: Indefinite\n            Power Dissipation: 830 mW",
+      "metadata": {
+        "chip_name": "LM358",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "32"
+        }
+      },
+      "chunk_index": 0
+    },
+    {
+      "id": "LM358_test.pdf_1",
+      "content": "2. ABSOLUTE MAXIMUM RATINGS\n            Supply Voltage: 32V (single), ±16V (dual)\n            Differential Input Voltage: 32V\n            Input Voltage: -0.3V to 32V\n            Output Short-Circuit Duration: Indefinite\n            Power Dissipation: 830 mW\n3. ELECTRICAL CHARACTERISTICS\n            Supply Voltage: 3V to 32V (single)\n            Quiescent Current: 500 μA (typical)\n            Input Bias Current: 45 nA (typical)\n            Input Offset Voltage: 3 mV (max)\n            Input Offset Current: 5 nA (max)",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "32"
+        }
+      },
+      "chunk_index": 1
+    },
+    {
+      "id": "LM358_test.pdf_2",
+      "content": "3. ELECTRICAL CHARACTERISTICS\n            Supply Voltage: 3V to 32V (single)\n            Quiescent Current: 500 μA (typical)\n            Input Bias Current: 45 nA (typical)\n            Input Offset Voltage: 3 mV (max)\n            Input Offset Current: 5 nA (max)\n4. PERFORMANCE\n            Open-Loop Gain: 100 dB (typical)\n            Gain-Bandwidth Product: 700 kHz\n            Slew Rate: 0.3 V/μs\n            Input Impedance: 1 MΩ\n            Output Impedance: 100 Ω",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {
+          "voltage": "3"
+        }
+      },
+      "chunk_index": 2
+    },
+    {
+      "id": "LM358_test.pdf_3",
+      "content": "4. PERFORMANCE\n            Open-Loop Gain: 100 dB (typical)\n            Gain-Bandwidth Product: 700 kHz\n            Slew Rate: 0.3 V/μs\n            Input Impedance: 1 MΩ\n            Output Impedance: 100 Ω\n5. PIN CONFIGURATION\n            Pin 1: Output A\n            Pin 2: Inverting Input A (-)\n            Pin 3: Non-inverting Input A (+)\n            Pin 4: VCC (Ground for single supply)\n            Pin 5: Non-inverting Input B (+)\n            Pin 6: Inverting Input B (-)\n            Pin 7: Output B\n            Pin 8: VCC+ (Positive supply)",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 3
+    },
+    {
+      "id": "LM358_test.pdf_4",
+      "content": "5. PIN CONFIGURATION\n            Pin 1: Output A\n            Pin 2: Inverting Input A (-)\n            Pin 3: Non-inverting Input A (+)\n            Pin 4: VCC (Ground for single supply)\n            Pin 5: Non-inverting Input B (+)\n            Pin 6: Inverting Input B (-)\n            Pin 7: Output B\n            Pin 8: VCC+ (Positive supply)\n6. APPLICATIONS\n            - Signal conditioning\n            - Active filters\n            - Buffers\n            - Comparators\n            - Voltage followers\n            - Summing amplifiers",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 4
+    },
+    {
+      "id": "LM358_test.pdf_5",
+      "content": "6. APPLICATIONS\n            - Signal conditioning\n            - Active filters\n            - Buffers\n            - Comparators\n            - Voltage followers\n            - Summing amplifiers\n7. TYPICAL CIRCUITS\n            Non-inverting Amplifier: Gain = 1 + Rf/Rg\n            Inverting Amplifier: Gain = -Rf/Rg\n            Voltage Follower: Gain = 1",
+      "metadata": {
+        "chip_name": "Unknown",
+        "category": "Unknown",
+        "specs": {}
+      },
+      "chunk_index": 5
+    }
+  ]
+}

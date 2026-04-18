@@ -1,0 +1,743 @@
+"""
+数据手册 RAG 助手后端服务
+基于检索增强生成(RAG)技术，智能阅读嵌入式芯片数据手册
+支持文档导出功能
+"""
+import os
+import re
+import json
+import math
+import time
+import requests
+from datetime import datetime
+from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from typing import List, Dict, Optional, Tuple
+
+# 配置
+DATASHEET_DIR = 'datasheets'
+INDEX_DIR = 'datasheet_index'
+DATASHEET_OUTPUT = 'datasheet_outputs'
+os.makedirs(DATASHEET_DIR, exist_ok=True)
+os.makedirs(INDEX_DIR, exist_ok=True)
+os.makedirs(DATASHEET_OUTPUT, exist_ok=True)
+
+
+class SimpleTextEmbedder:
+    """简单的文本嵌入器（基于关键词频率）"""
+    def __init__(self):
+        self.vocab = {}
+        self.vocab_size = 0
+
+    def _tokenize(self, text: str) -> List[str]:
+        """简单分词"""
+        text = re.sub(r'[^\w\s]', ' ', text.lower())
+        return text.split()
+
+    def _build_vocab(self, texts: List[str]):
+        """构建词表"""
+        word_freq = {}
+        for text in texts:
+            tokens = self._tokenize(text)
+            for token in tokens:
+                if len(token) > 2:
+                    word_freq[token] = word_freq.get(token, 0) + 1
+
+        sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
+        self.vocab = {word: i for i, (word, _) in enumerate(sorted_words[:5000])}
+        self.vocab_size = len(self.vocab)
+
+    def embed(self, text: str) -> List[float]:
+        """生成嵌入向量"""
+        if not self.vocab:
+            return [0.0] * 128
+
+        tokens = self._tokenize(text)
+        vector = [0.0] * min(self.vocab_size, 128)
+
+        for token in tokens:
+            if token in self.vocab and self.vocab[token] < 128:
+                vector[self.vocab[token]] += 1
+
+        # 归一化
+        norm = math.sqrt(sum(x * x for x in vector))
+        if norm > 0:
+            vector = [x / norm for x in vector]
+
+        return vector
+
+    def compute_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """计算余弦相似度"""
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        norm1 = math.sqrt(sum(a * a for a in vec1))
+        norm2 = math.sqrt(sum(b * b for b in vec2))
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        return dot_product / (norm1 * norm2)
+
+
+class DatasheetRAG:
+    """数据手册 RAG 引擎"""
+
+    def __init__(self):
+        self.documents = []
+        self.embedder = SimpleTextEmbedder()
+        self.current_file = None
+        self.current_chip = None
+
+    def _extract_text_from_simple(self, file_path: str) -> str:
+        """从PDF提取文本（简化版本）"""
+        try:
+            import pdfplumber
+            text_parts = []
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if text:
+                        text_parts.append(text)
+            return '\n'.join(text_parts)
+        except ImportError:
+            return self._generate_demo_content(file_path)
+
+    def _generate_demo_content(self, file_path: str) -> str:
+        """为演示生成芯片数据内容"""
+        filename = os.path.basename(file_path).lower()
+
+        demos = {
+            'stm32': """
+            STM32F4xx Microcontroller Datasheet
+
+            1. PRODUCT OVERVIEW
+            The STM32F405xx and STM32F407xx are based on the high-performance
+            ARM Cortex-M4 32-bit RISC core operating at a frequency of up to 168 MHz.
+
+            2. FEATURES
+            - Core: ARM Cortex-M4 with FPU, up to 168 MHz
+            - Flash: Up to 1 MB
+            - SRAM: Up to 192 KB
+            - ADC: 12-bit, 16 channels, up to 2.4 MSPS
+            - DAC: 12-bit, 2 channels
+            - Timers: Up to 14 timers
+            - Communication: USART, SPI, I2C, CAN, USB OTG
+            - Operating Voltage: 1.8V to 3.6V
+            - Operating Temperature: -40C to 85C
+
+            3. PIN DEFINITIONS
+            VDD: Power supply (1.8V-3.6V)
+            VSS: Ground
+            PA0-PA15: Port A pins
+            PB0-PB15: Port B pins
+            PC0-PC15: Port C pins
+            VDDA: Analog supply
+            VSSA: Analog ground
+            BOOT0: Boot selection
+            NRST: Reset pin (active low)
+
+            4. ADC SPECIFICATIONS
+            Resolution: 12-bit (0-4095)
+            Sampling Rate: Up to 2.4 MSPS
+            Input Channels: 16 external + 2 internal
+            Reference Voltage: VREF+ (typically 3.3V)
+            Conversion Time: 12 cycles for 12-bit
+
+            5. GPIO SPECIFICATIONS
+            Output Current: 25 mA per pin (max)
+            Total Current: 120 mA per port (max)
+            Input Voltage: -0.3V to VDD+0.3V
+            Pull-up/Pull-down: 40 kOhm typical
+
+            6. I2C SPECIFICATIONS
+            Speed: Standard (100 kHz), Fast (400 kHz)
+            Address: 7-bit or 10-bit
+            Noise Filter: Built-in 50ns filter
+            Clock Stretching: Supported
+
+            7. UART SPECIFICATIONS
+            Baud Rate: Up to 10.5 Mbps
+            Data Bits: 8 or 9
+            Stop Bits: 1 or 2
+            Parity: None, Even, Odd
+            Flow Control: RTS/CTS optional
+
+            8. POWER CONSUMPTION
+            Run Mode: 100 mA @ 168 MHz
+            Sleep Mode: 30 mA
+            Stop Mode: 100 uA
+            Standby Mode: 2 uA
+
+            9. MEMORY MAP
+            0x08000000 - 0x08100000: Flash (1 MB)
+            0x20000000 - 0x20030000: SRAM (192 KB)
+            0x40020000 - 0x40020400: APB1 Peripherals
+            0x40010000 - 0x40010400: APB2 Peripherals
+
+            10. CLOCK CONFIGURATION
+            HSI: 16 MHz internal RC
+            HSE: 4-26 MHz external crystal
+            PLL: Up to 168 MHz output
+            """,
+            'esp32': """
+            ESP32-WROOM-32 Datasheet
+
+            1. OVERVIEW
+            The ESP32 is a low-power system on a chip microcontrollers
+            with integrated Wi-Fi and dual-mode Bluetooth.
+
+            2. SPECIFICATIONS
+            Processor: Dual-core Xtensa LX6, up to 240 MHz
+            SRAM: 520 KB
+            Flash: 4 MB (external)
+            WiFi: 802.11 b/g/n
+            Bluetooth: BLE 4.2
+            GPIO: 34 pins
+            Operating Voltage: 2.2V to 3.6V
+            Operating Temperature: -40C to 85C
+
+            3. POWER SPECIFICATIONS
+            Supply Voltage: 3.3V
+            Current Consumption:
+            - WiFi TX: 240 mA (peak)
+            - WiFi RX: 95 mA
+            - Bluetooth TX: 130 mA
+            - Light Sleep: 0.8 mA
+            - Deep Sleep: 10 uA
+
+            4. GPIO SPECIFICATIONS
+            Number of GPIOs: 34
+            Output Current: 40 mA (max per pin)
+            Total Current: 400 mA (VDD pins)
+            Input Voltage: 0V to 3.3V (5V tolerant with strap)
+            Pull-up/Pull-down: 45 kOhm typical
+
+            5. WiFi SPECIFICATIONS
+            Standard: 802.11 b/g/n
+            Frequency: 2.4 GHz
+            Channels: 13 (CN), 11 (US)
+            TX Power: +20 dBm (max)
+            RX Sensitivity: -98 dBm
+
+            6. ADC SPECIFICATIONS
+            Channels: 18 (2 at 1.8V, 16 at 3.3V)
+            Resolution: 12-bit
+            Sampling Rate: Up to 2 MSPS
+            Reference: VDD (3.3V)
+            Accuracy: +/-1%
+
+            7. I2C SPECIFICATIONS
+            Speed: Up to 400 kHz
+            Address Range: 0x00-0x7F
+            pins: GPIO21 (SDA), GPIO22 (SCL)
+            """,
+            'lm358': """
+            LM358 Dual Operational Amplifier Datasheet
+
+            1. DESCRIPTION
+            The LM358 consists of two independent, high-gain,
+            internal frequency-compensated operational amplifiers.
+
+            2. ABSOLUTE MAXIMUM RATINGS
+            Supply Voltage: 32V (single), +/-16V (dual)
+            Differential Input Voltage: 32V
+            Input Voltage: -0.3V to 32V
+            Output Short-Circuit Duration: Indefinite
+            Power Dissipation: 830 mW
+
+            3. ELECTRICAL CHARACTERISTICS
+            Supply Voltage: 3V to 32V (single)
+            Quiescent Current: 500 uA (typical)
+            Input Bias Current: 45 nA (typical)
+            Input Offset Voltage: 3 mV (max)
+            Input Offset Current: 5 nA (max)
+
+            4. PERFORMANCE
+            Open-Loop Gain: 100 dB (typical)
+            Gain-Bandwidth Product: 700 kHz
+            Slew Rate: 0.3 V/us
+            Input Impedance: 1 MOhm
+            Output Impedance: 100 Ohm
+
+            5. PIN CONFIGURATION
+            Pin 1: Output A
+            Pin 2: Inverting Input A (-)
+            Pin 3: Non-inverting Input A (+)
+            Pin 4: VCC (Ground for single supply)
+            Pin 5: Non-inverting Input B (+)
+            Pin 6: Inverting Input B (-)
+            Pin 7: Output B
+            Pin 8: VCC+ (Positive supply)
+            """
+        }
+
+        for key, content in demos.items():
+            if key in filename:
+                return content
+
+        return """
+        Generic Chip Datasheet
+        This is a generic chip datasheet template.
+        """
+
+    def _chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
+        """将文本分割成重叠的块"""
+        paragraphs = text.split('\n\n')
+        chunks = []
+        current_chunk = []
+
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+
+            current_text = '\n'.join(current_chunk)
+            if len(current_text) + len(para) > chunk_size and current_chunk:
+                chunks.append(current_text)
+                current_chunk = [current_chunk[-1], para]
+            else:
+                current_chunk.append(para)
+
+        if current_chunk:
+            chunks.append('\n'.join(current_chunk))
+
+        return chunks
+
+    def _extract_metadata(self, text: str) -> Dict:
+        """从文本中提取元数据"""
+        metadata = {
+            'chip_name': 'Unknown',
+            'category': 'Unknown',
+            'specs': {}
+        }
+
+        chip_patterns = [
+            r'(STM32[FP]\w+)',
+            r'(ESP32[-\w]+)',
+            r'(ATmega\d+)',
+            r'(PIC\d+\w+)',
+            r'(LM\d+)',
+            r'(TPS\d+)',
+        ]
+
+        for pattern in chip_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                metadata['chip_name'] = match.group(1)
+                break
+
+        spec_patterns = {
+            'voltage': r'(\d+\.?\d*)V',
+            'frequency': r'(\d+)\s*MHz',
+            'current': r'(\d+)\s*mA',
+            'resolution': r'(\d+)-bit',
+        }
+
+        for spec_name, pattern in spec_patterns.items():
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                metadata['specs'][spec_name] = match.group(1)
+
+        return metadata
+
+    def load_document(self, file_path: str) -> Dict:
+        """加载并索引文档"""
+        filename = os.path.basename(file_path)
+        self.current_file = filename
+
+        text = self._extract_text_from_simple(file_path)
+        chunks = self._chunk_text(text)
+        new_docs = []
+
+        for i, chunk in enumerate(chunks):
+            doc = {
+                'id': f'{filename}_{i}',
+                'content': chunk,
+                'metadata': self._extract_metadata(chunk),
+                'chunk_index': i,
+                'source': filename
+            }
+            new_docs.append(doc)
+
+        existing_sources = set(d.get('source') for d in self.documents)
+        self.documents = [d for d in self.documents if d.get('source') != filename]
+        self.documents.extend(new_docs)
+
+        self.embedder._build_vocab([d['content'] for d in self.documents])
+        for doc in self.documents:
+            doc['embedding'] = self.embedder.embed(doc['content'])
+
+        self._save_index()
+
+        return {
+            'filename': filename,
+            'chunks': len(chunks),
+            'metadata': self._extract_metadata(text),
+            'total_chunks': len(self.documents)
+        }
+
+    def _save_index(self):
+        """保存索引到磁盘"""
+        index_file = os.path.join(INDEX_DIR, 'current_index.json')
+        index_data = {
+            'current_file': self.current_file,
+            'documents': [
+                {k: v for k, v in d.items() if k != 'embedding'}
+                for d in self.documents
+            ]
+        }
+        os.makedirs(INDEX_DIR, exist_ok=True)
+        with open(index_file, 'w', encoding='utf-8') as f:
+            json.dump(index_data, f, ensure_ascii=False, indent=2)
+
+    def _load_index(self, filename: str) -> bool:
+        """加载索引"""
+        index_file = os.path.join(INDEX_DIR, f'{filename}.json')
+        if not os.path.exists(index_file):
+            return False
+
+        try:
+            with open(index_file, 'r', encoding='utf-8') as f:
+                index_data = json.load(f)
+
+            self.documents = index_data['documents']
+            for doc in self.documents:
+                doc['embedding'] = self.embedder.embed(doc['content'])
+
+            self.current_file = filename
+            return True
+        except Exception as e:
+            print(f'加载索引失败: {e}')
+            return False
+
+    def retrieve(self, query: str, top_k: int = 3) -> List[Dict]:
+        """检索相关文档块"""
+        if not self.documents:
+            return []
+
+        query_lower = query.lower()
+        query_words = set(re.findall(r'\w+', query_lower))
+
+        results = []
+        for doc in self.documents:
+            content_lower = doc['content'].lower()
+            content_words = set(re.findall(r'\w+', content_lower))
+
+            overlap = len(query_words & content_words)
+            keyword_score = overlap / max(len(query_words), 1)
+
+            if 'embedding' not in doc:
+                doc['embedding'] = self.embedder.embed(doc['content'])
+            embed_score = self.embedder.compute_similarity(
+                self.embedder.embed(query),
+                doc['embedding']
+            )
+
+            combined_score = keyword_score * 0.7 + embed_score * 0.3
+
+            chip_keywords = ['stm32', 'esp32', 'lm358', 'atmega', 'pic', 'tps', 'lm']
+            for chip in chip_keywords:
+                if chip in query_lower and chip in content_lower:
+                    combined_score += 0.3
+                    break
+
+            results.append({
+                'content': doc['content'],
+                'metadata': doc.get('metadata', {}),
+                'score': combined_score,
+                'source': doc.get('source', '')
+            })
+
+        results.sort(key=lambda x: x['score'], reverse=True)
+        return results[:top_k]
+
+    def ask(self, question: str, model: str = '') -> Dict:
+        """使用RAG回答问题（优先RAG，fallback到LLM）"""
+        # 1. 先尝试 RAG 检索
+        relevant_docs = self.retrieve(question)
+
+        if relevant_docs:
+            # 有RAG数据，用RAG回答
+            context = '\n\n'.join([doc['content'] for doc in relevant_docs])
+            answer = self._generate_answer(question, context, relevant_docs)
+            return {
+                'content': answer,
+                'source': relevant_docs[0]['metadata'].get('chip_name', '数据手册')
+            }
+
+        # 2. 没有上传PDF时，fallback到LLM回答（这样始终有消息内容）
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except:
+            pass
+
+        API_KEY = os.getenv('DEEPSEEK_KEY')
+        API_URL = os.getenv('DEEPSEEK_URL')
+
+        if API_KEY and API_URL:
+            import requests
+            headers = {
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "",
+                "messages": [
+                    {"role": "system", "content": "你是一个专业的嵌入式系统工程师，擅长回答单片机、芯片、嵌入式开发相关问题。回答要专业、简洁、有技术深度。"},
+                    {"role": "user", "content": question}
+                ],
+                "temperature": 0.7
+            }
+            try:
+                resp = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+                result = resp.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    llm_answer = result["choices"][0]["message"]["content"].strip()
+                    return {
+                        'content': llm_answer,
+                        'source': '嵌入式助手'
+                    }
+            except Exception as e:
+                print(f"LLM调用失败: {e}")
+                pass
+
+        # 3. 连API都失败了，返回友好提示
+        return {
+            'content': '抱歉，没有找到相关的文档内容，也没有连接到AI服务。\n\n请尝试：\n1. 上传数据手册PDF文件\n2. 检查后端服务是否正常运行\n3. 确认 .env 中的 API 配置正确',
+            'source': None
+        }
+
+    def _generate_answer(self, question: str, context: str, relevant_docs: List[Dict]) -> str:
+        """生成回答"""
+        question_lower = question.lower()
+        answer_parts = []
+
+        if 'adc' in question_lower or '分辨率' in question_lower or '采样' in question_lower:
+            for doc in relevant_docs:
+                content = doc['content']
+                content_lower = content.lower()
+                if 'adc' in content_lower or 'resolution' in content_lower or '采样' in content_lower:
+                    for line in content.split('\n'):
+                        if 'resolution' in line.lower() or '12-bit' in line or 'bit' in line.lower():
+                            if any(x in line.lower() for x in ['adc', 'resolution', 'sampling']):
+                                answer_parts.append(line.strip())
+
+        elif 'gpio' in question_lower or '引脚' in question_lower or '电流' in question_lower:
+            for doc in relevant_docs:
+                content = doc['content']
+                content_lower = content.lower()
+                if 'gpio' in content_lower or 'pin' in content_lower or 'output current' in content_lower:
+                    for line in content.split('\n'):
+                        if 'current' in line.lower() or 'output' in line.lower():
+                            if any(x in line.lower() for x in ['ma', 'gpio', 'output']):
+                                answer_parts.append(line.strip())
+
+        elif 'i2c' in question_lower or 'uart' in question_lower or 'spi' in question_lower:
+            for doc in relevant_docs:
+                content = doc['content']
+                content_lower = content.lower()
+                if 'i2c' in content_lower:
+                    for line in content.split('\n'):
+                        if 'i2c' in line.lower() or 'speed' in line.lower() or 'khz' in line.lower():
+                            answer_parts.append(line.strip())
+
+        elif '功耗' in question_lower or 'power' in question_lower or '电流' in question_lower:
+            for doc in relevant_docs:
+                content = doc['content']
+                content_lower = content.lower()
+                if 'power' in content_lower or 'current' in content_lower or 'ma' in content_lower:
+                    for line in content.split('\n'):
+                        if 'mode' in line.lower() or 'ma' in line.lower() or 'μa' in line.lower():
+                            answer_parts.append(line.strip())
+
+        if answer_parts:
+            answer = '\n\n'.join(answer_parts[:2])
+            answer += f"\n\n📖 信息来源：数据手册相关内容"
+            return answer
+
+        summary = "根据数据手册内容，以下信息可能相关：\n\n"
+        for i, doc in enumerate(relevant_docs[:2], 1):
+            content_preview = doc['content'][:300].replace('\n', ' ')
+            summary += f"{i}. {content_preview}...\n\n"
+        summary += "📖 信息来源：数据手册（基于语义检索）"
+        return summary
+
+    # ============ 文档导出功能 ============
+
+    def export_to_document(self, question: str, answer: str, format: str = "docx") -> Dict:
+        """
+        将问答结果导出为文档
+        format: 'docx' 或 'md'
+        """
+        timestamp = int(time.time())
+        chip_name = self.current_file or "Unknown"
+
+        if format == "md":
+            filename = f"数据手册问答_{chip_name}_{timestamp}.md"
+            filepath = os.path.join(DATASHEET_OUTPUT, filename)
+
+            md_content = f"""# {chip_name} - 技术问答
+
+> 问题时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+---
+
+## 问题
+{question}
+
+---
+
+## 回答
+{answer}
+
+---
+
+## 相关文档信息
+
+- 芯片型号：{chip_name}
+- 文档块数：{len(self.documents)}
+- 导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+---
+
+*本文档由数据手册助手自动生成*
+"""
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+
+        else:
+            filename = f"数据手册问答_{chip_name}_{timestamp}.docx"
+            filepath = os.path.join(DATASHEET_OUTPUT, filename)
+
+            doc = Document()
+            doc.add_heading(chip_name, 0)
+            p = doc.add_paragraph()
+            p.add_run('技术问答记录').bold = True
+
+            # 问题
+            doc.add_heading('问题', 1)
+            doc.add_paragraph(question)
+
+            # 回答
+            doc.add_heading('回答', 1)
+            doc.add_paragraph(answer)
+
+            # 元信息
+            doc.add_paragraph()
+            meta = doc.add_paragraph()
+            meta_run = meta.add_run(f'\n芯片型号：{chip_name}\n')
+            meta_run.font.size = Pt(9)
+            meta_run.font.color.rgb = RGBColor(128, 128, 128)
+            meta_run2 = meta.add_run(f'导出时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+            meta_run2.font.size = Pt(9)
+            meta_run2.font.color.rgb = RGBColor(128, 128, 128)
+
+            doc.save(filepath)
+
+        return {
+            "content": answer,
+            "filename": filename,
+            "filepath": filepath,
+            "source": "数据手册助手"
+        }
+
+    def export_full_specs(self, format: str = "docx") -> Dict:
+        """
+        导出当前文档的所有技术规格
+        """
+        if not self.documents:
+            return {
+                "content": "没有已加载的文档",
+                "source": "数据手册助手"
+            }
+
+        timestamp = int(time.time())
+        chip_name = self.current_file or "Unknown"
+
+        if format == "md":
+            filename = f"{chip_name}_技术规格_{timestamp}.md"
+            filepath = os.path.join(DATASHEET_OUTPUT, filename)
+
+            # 收集所有内容
+            all_content = []
+            for doc in self.documents:
+                all_content.append(doc['content'])
+
+            md_content = f"""# {chip_name} - 完整技术规格
+
+> 导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+---
+
+## 文档概述
+
+- 芯片型号：{chip_name}
+- 内容块数：{len(self.documents)}
+- 导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+---
+
+## 技术规格内容
+
+"""
+
+            for i, content in enumerate(all_content, 1):
+                md_content += f"### 第 {i} 部分\n\n{content}\n\n---\n\n"
+
+            md_content += """
+## 使用说明
+
+本文档由数据手册助手根据上传的数据手册自动提取生成。内容包括芯片的各项技术规格、电气参数、引脚定义等。
+
+**注意事项：**
+1. 本文档仅供参考，请以原始数据手册为准
+2. 如有疑问，请查阅官方数据手册
+3. 某些详细参数可能需要参考特定章节
+
+---
+
+*本文档由数据手册助手自动生成*
+"""
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+
+        else:
+            filename = f"{chip_name}_技术规格_{timestamp}.docx"
+            filepath = os.path.join(DATASHEET_OUTPUT, filename)
+
+            doc = Document()
+            doc.add_heading(chip_name, 0)
+            doc.add_heading('完整技术规格', 1)
+
+            # 元信息
+            meta = doc.add_paragraph()
+            meta.add_run(f'内容块数：{len(self.documents)}\n')
+            meta.add_run(f'导出时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+
+            doc.add_paragraph()
+
+            # 添加所有内容块
+            for i, doc_item in enumerate(self.documents, 1):
+                doc.add_heading(f'规格 {i}', 2)
+                for para in doc_item['content'].split('\n'):
+                    para = para.strip()
+                    if para:
+                        doc.add_paragraph(para)
+
+
+            # Build content for return value
+            content_text = chr(10).join(doc_item['content'] for doc_item in self.documents)
+
+            doc.save(filepath)
+
+        return {
+            "content": content_text,
+            "filename": filename,
+            "filepath": filepath,
+            "source": "数据手册助手"
+        }
+
+
+# 全局单例
+datasheet_rag = DatasheetRAG()

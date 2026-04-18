@@ -1,0 +1,345 @@
+import os
+import requests
+import json
+import re
+import time
+import urllib.parse # 🚨 新增：用于 URL 转码
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+from dotenv import load_dotenv
+
+from docx import Document
+from docx.shared import Pt, RGBColor
+
+# 🚨 新增：高德地图通勤助手
+from commute_helper import CommuteHelper
+commute_helper = CommuteHelper()
+
+load_dotenv(override=True)
+
+app = Flask(__name__)
+CORS(app)
+
+UPLOAD_FOLDER = 'uploads'
+OUTPUT_FOLDER = 'outputs'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+def get_model_config():
+    return {
+        "deepseek": {"url": os.getenv("DEEPSEEK_URL"), "key": os.getenv("DEEPSEEK_KEY"), "model": "deepseek-chat"},
+        "kimi": {"url": os.getenv("KIMI_URL"), "key": os.getenv("KIMI_KEY"), "model": "moonshot-v1-8k"},
+        "doubao": {"url": "https://ark.cn-beijing.volces.com/api/v3/responses", "key": os.getenv("DOUBAO_KEY"), "model": "doubao-seed-2-0-pro-260215"}
+    }
+
+def process_document_with_agent(filepath, original_filename, question, system_prompt, config):
+    try:
+        doc = Document(filepath)
+        paragraphs_text = [p.text for p in doc.paragraphs if p.text.strip()]
+        full_text = "\n".join(paragraphs_text)
+
+        agent_prompt = f"""你是一个专业的文档排版与润色智能体。
+用户指令：{question}
+
+文档内容如下：
+{full_text}
+
+请严格按以下JSON格式返回修改建议（不要返回任何Markdown解释，只返回纯JSON字符串）：
+{{
+  "rewrite_tasks": [
+    {{"target_text": "需要被替换的原句子", "new_text": "润色后的新句子"}}
+  ],
+  "format_tasks": [
+    {{"target": "body_text", "font_name": "SimSun", "font_size": 14, "bold": false, "italic": false, "underline": false, "color": "black"}},
+    {{"target": "text:特定文本", "font_size": 16, "bold": true, "color": "red"}}
+  ]
+}}
+
+📋 format_tasks 字段说明：
+- target: 修改对象
+  * "body_text" = 修改整个文档的所有文本
+  * "text:具体文本内容" = 只修改特定的文本（例如 "text:第一段" 只修改"第一段"这个文本）
+- font_name: 字体名称（必填）
+  * SimSun = 宋体
+  * SimHei = 黑体
+  * Arial = 英文Arial字体
+  * Courier New = 等宽字体
+  * Comic Sans = 手写体
+- font_size: 数字，字体大小（如 12、14、16、20）
+- bold: true=加粗，false=不加粗
+- italic: true=斜体，false=不斜体
+- underline: true=下划线，false=无下划线
+- color: 字体颜色，可用值包括：
+  * black（黑色）、red（红色）、blue（蓝色）、green（绿色）
+  * yellow（黄色）、orange（橙色）、purple（紫色）、brown（棕色）
+  * gray/grey（灰色）、white（白色）、pink（粉色）、cyan（青色）
+  * magenta（品红）、lime（青绿）、navy（深蓝）、teal（深青）、olive（橄榄绿）
+
+📌 重要指南：
+1. 用户要求「把第二段改成红色加粗」时，你应该返回：
+   {{"target": "text:第二段", "color": "red", "bold": true, "font_name": "SimHei", "font_size": 14}}
+
+2. 用户要求「把整个文档改成黑体12号」时，返回：
+   {{"target": "body_text", "font_name": "SimHei", "font_size": 12}}
+
+3. 如果图片中的用户指令没有提及字体，保持原样（不填相关字段）
+4. 如果用户没有要求修改格式，format_tasks 可以为空数组 []
+5. 重点：所有布尔值（bold、italic、underline）必须是 true 或 false，不能是 1/0 或 yes/no
+"""
+
+        payload = {
+            "model": config["model"],
+            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": agent_prompt}]
+        }
+
+        headers = {"Authorization": f"Bearer {config['key']}", "Content-Type": "application/json"}
+        resp = requests.post(config["url"], headers=headers, json=payload, timeout=300)
+        result = resp.json()
+        
+        if "choices" not in result or len(result["choices"]) == 0:
+            err_msg = result.get("error", {}).get("message", "API返回的数据异常")
+            return jsonify({"content": f"大模型接口拒绝了请求，原因：\n{err_msg}", "source": "系统"})
+
+        answer = result["choices"][0]["message"].get("content", "").strip()
+        start_idx = answer.find('{')
+        end_idx = answer.rfind('}')
+        
+        if start_idx != -1 and end_idx != -1:
+            json_str = answer[start_idx:end_idx+1]
+            json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
+            instructions = json.loads(json_str, strict=False)
+        else:
+            raise ValueError(f"大模型没有返回包含 {{}} 的有效 JSON 数据。原回复：\n{answer}")
+
+        for task in instructions.get("rewrite_tasks", []):
+            old_text = task.get("target_text", "")
+            new_text = task.get("new_text", "")
+            if old_text and new_text:
+                for p in doc.paragraphs:
+                    if old_text in p.text:
+                        # 🚨 核心修复：使用 replace_text 确保格式正确应用
+                        for run in p.runs:
+                            if old_text in run.text:
+                                run.text = run.text.replace(old_text, new_text)
+
+        for task in instructions.get("format_tasks", []):
+            target = task.get("target")
+            font_name = task.get("font_name")
+            font_size = task.get("font_size")
+            bold = task.get("bold", False)
+            italic = task.get("italic", False)
+            underline = task.get("underline", False)
+            color = task.get("color", "black")
+            
+            # 🚨 颜色映射表：支持常见的中文和英文颜色名称
+            color_map = {
+                "black": (0, 0, 0),
+                "red": (255, 0, 0),
+                "blue": (0, 0, 255),
+                "green": (0, 128, 0),
+                "yellow": (255, 255, 0),
+                "orange": (255, 165, 0),
+                "purple": (128, 0, 128),
+                "brown": (165, 42, 42),
+                "gray": (128, 128, 128),
+                "grey": (128, 128, 128),
+                "white": (255, 255, 255),
+                "pink": (255, 192, 203),
+                "cyan": (0, 255, 255),
+                "magenta": (255, 0, 255),
+                "lime": (0, 255, 0),
+                "navy": (0, 0, 128),
+                "teal": (0, 128, 128),
+                "olive": (128, 128, 0),
+            }
+            
+            print(f"📝 应用格式: target={target}, font={font_name}, size={font_size}, bold={bold}, color={color}")
+            
+            if target == "body_text":
+                # 遍历所有段落和run，应用格式
+                for p in doc.paragraphs:
+                    for run in p.runs:
+                        # 应用字体名称
+                        if font_name:
+                            run.font.name = font_name
+                            run.font.ascii_theme_color = None  # 清除主题颜色以使用自定义颜色
+                        
+                        # 应用字体大小
+                        if font_size:
+                            run.font.size = Pt(font_size)
+                        
+                        # 应用加粗
+                        if bold:
+                            run.font.bold = True
+                        
+                        # 应用斜体
+                        if italic:
+                            run.font.italic = True
+                        
+                        # 应用下划线
+                        if underline:
+                            run.font.underline = True
+                        
+                        # 应用颜色（这是关键！）
+                        if color and color.lower() in color_map:
+                            rgb = color_map[color.lower()]
+                            run.font.color.rgb = RGBColor(*rgb)
+                            print(f"✅ 颜色已应用: {color} = RGB{rgb}")
+            
+            # 支持特定文本的格式修改
+            elif target and target.startswith("text:"):
+                target_text = target.replace("text:", "").strip()
+                print(f"🔍 寻找特定文本: {target_text}")
+                
+                for p in doc.paragraphs:
+                    for run in p.runs:
+                        if target_text in run.text:
+                            if font_name:
+                                run.font.name = font_name
+                            if font_size:
+                                run.font.size = Pt(font_size)
+                            if bold:
+                                run.font.bold = True
+                            if italic:
+                                run.font.italic = True
+                            if underline:
+                                run.font.underline = True
+                            if color and color.lower() in color_map:
+                                rgb = color_map[color.lower()]
+                                run.font.color.rgb = RGBColor(*rgb)
+                            print(f"✅ 文本格式已应用: {target_text}")
+
+        print("🎉 文档格式处理完成！")
+
+        timestamp = int(time.time())
+        output_filename = f"修改后_{timestamp}_{original_filename}"
+        output_path = os.path.join(OUTPUT_FOLDER, output_filename)
+        doc.save(output_path)
+
+        # 🚨 核心修复：用固定 IP 而非 request.host，避免手机端拿到无效地址
+        server_ip = os.getenv("SERVER_IP", "192.168.139.221")
+        server_port = os.getenv("FLASK_PORT", "5000")
+        encoded_filename = urllib.parse.quote(output_filename)
+        file_url = f"http://{server_ip}:{server_port}/api/download/{encoded_filename}"
+
+        return jsonify({
+            "content": "✅ 文档已智能排版与润色完毕！\n请点击下方文件卡片导出至手机。",
+            "source": "文档专家",
+            "file_path": file_url  
+        })
+
+    except json.JSONDecodeError:
+        return jsonify({"content": f"处理失败：提取出的指令不是标准JSON格式。\n大模型原回复：\n{answer}", "source": "系统"})
+    except Exception as e:
+        return jsonify({"content": f"文档处理本地执行异常：{str(e)}", "source": "系统"})
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        data = request.form
+        question = data.get('question', '').strip()
+        system_prompt = data.get('system_prompt', '你是一个AI助手')
+        model = data.get('model', 'kimi') 
+        
+        document = request.files.get('document')
+        if not document or document.filename == '':
+            return jsonify({"content": "未接收到有效的文档文件", "source": "错误"})
+
+        try:
+            original_filename = document.filename.replace('/', '_').replace('\\', '_') 
+            safe_input_filename = f"upload_{int(time.time())}_{original_filename}"
+            input_path = os.path.join(UPLOAD_FOLDER, safe_input_filename)
+            document.save(input_path)
+            
+            config = get_model_config()[model]
+            return process_document_with_agent(input_path, original_filename, question, system_prompt, config)
+        except Exception as e:
+            return jsonify({"content": f"文件保存或处理失败: {str(e)}", "source": "错误"})
+
+    else:
+        data = request.json
+        question = data.get('question', '').strip()
+        image_data = data.get('image_data')
+        model = data.get('model', 'deepseek')
+        system_prompt = data.get('system_prompt', '你叫小陆，是圆圆的贴心助手。')
+
+        # 🚨 新增：检查是否为通勤助手请求
+        if is_commute_request(question):
+            return jsonify(commute_helper.handle_request(question))
+
+        if image_data: model = "doubao"
+        config = get_model_config()[model]
+        headers = {"Authorization": f"Bearer {config['key']}", "Content-Type": "application/json"}
+
+        try:
+            if model == "doubao":
+                content = []
+                if image_data: content.append({"type": "input_image", "image_url": f"data:image/png;base64,{image_data}"})
+                content.append({"type": "input_text", "text": question if question else "描述这张图片"})
+                payload = {"model": config["model"], "input": [{"role": "user", "content": content}]}
+            else:
+                payload = {"model": config["model"], "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": question}]}
+
+            resp = requests.post(config["url"], headers=headers, json=payload, timeout=90)
+            result = resp.json()
+            answer = ""
+
+            if "output" in result:
+                for out in result["output"]:
+                    if out.get("type") == "message":
+                        for c in out.get("content", []):
+                            if c.get("type") == "output_text":
+                                answer = c.get("text", "").strip()
+                                break
+                        break
+            elif "choices" in result and len(result["choices"]) > 0:
+                answer = result["choices"][0]["message"].get("content", "").strip()
+
+            if not answer:
+                answer = f"提示：{result.get('error', {}).get('message', '服务暂时无法回复')}"
+
+            return jsonify({"content": answer, "source": {"deepseek": "DeepSeek", "kimi": "Kimi", "doubao": "豆包"}.get(model, "AI")})
+
+        except Exception as e:
+            return jsonify({"content": f"服务异常，请稍后再试: {str(e)}", "source": "系统"})
+
+# 🚨 新增：让手机能够下载文件的专属接口
+@app.route('/api/download/<path:filename>', methods=['GET'])
+def download_file(filename):
+    return send_from_directory(OUTPUT_FOLDER, filename, as_attachment=True)
+
+# 🚨 新增：判断是否为通勤助手请求
+def is_commute_request(question):
+    """判断用户请求是否与通勤助手相关"""
+    commute_keywords = [
+        "通勤", "路线", "怎么走", "从.*到", "搜索", "附近", "公交",
+        "驾车", "开车", "步行", "走路", "导航", "地点", "位置",
+        "哪里有", "找.*", "去.*", "到.*", "连续搜索"
+    ]
+
+    for keyword in commute_keywords:
+        if re.search(keyword, question):
+            return True
+    return False
+
+if __name__ == '__main__':
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.getenv("FLASK_PORT", 5000))
+    server_ip = os.getenv("SERVER_IP", "192.168.139.221")
+
+    print("\n" + "="*60)
+    print("后端服务已启动！")
+    print("="*60)
+    print(f"监听地址: {host}:{port}")
+    print(f"Flutter 访问地址: http://{server_ip}:{port}/api/chat")
+    print("="*60)
+    print("提示：确保你的 Flutter 代码中 _backendUrl 也设置为:")
+    print(f"   http://{server_ip}:{port}/api/chat")
+    print("\n如果连接失败，请检查：")
+如果连接失败，请检查：")
+    print("   1. 手机/模拟器是否与电脑在同一网络")
+    print("   2. 防火墙是否允许 5000 端口")
+    print("   3. IP地址是否正确（在 cmd 中运行 ipconfig 查看 IPv4地址）")
+    print("="*60 + "\n")
+
+    app.run(host=host, port=port, debug=False)

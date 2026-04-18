@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python)",
+      "Bash(python -c \"from commute_helper import CommuteHelper; c = CommuteHelper\\(\\); print\\(c.handle_request\\('搜索附近的咖啡店'\\)\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(curl -s -X POST http://localhost:5000/api/chat -H \"Content-Type: application/json\" -d '{\"question\": \"从杭州火车站到西湖\"}')",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('content','无内容'\\)[:500]\\)\")",
+      "Bash(powershell -Command \"Stop-Process -Id 12608 -Force -ErrorAction SilentlyContinue\")",
+      "Bash(python -c \"from commute_helper import is_commute_request, commute_helper; print\\('commute_helper OK'\\)\")",
+      "Bash(python -c \"from datasheet_rag import datasheet_rag; print\\('datasheet_rag OK'\\)\")",
+      "Bash(python -c \"from paper_helper import generate_outline, polish_text, rewrite_text, format_references, check_format, get_template, generate_outline_document, generate_polish_document, generate_references_document; print\\('paper_helper OK'\\)\")",
+      "Bash(curl -s -X POST http://192.168.2.6:5000/api/chat -H \"Content-Type: application/json\" -d \"{\\\\\"question\\\\\":\\\\\"hello\\\\\",\\\\\"model\\\\\":\\\\\"\\\\\"}\")",
+      "Bash(curl -v -X POST http://192.168.2.6:5000/api/chat -H \"Content-Type: application/json\" -d \"{\\\\\"question\\\\\":\\\\\"hello\\\\\",\\\\\"model\\\\\":\\\\\"\\\\\"}\")",
+      "Bash(curl -v -X POST http://127.0.0.1:5000/api/chat -H \"Content-Type: application/json\" -d \"{\\\\\"question\\\\\":\\\\\"hello\\\\\",\\\\\"model\\\\\":\\\\\"\\\\\"}\")",
+      "Bash(python3 -c ':*)",
+      "Bash(python3 fix_env.py)",
+      "Bash(python3 _fix_key.py)",
+      "Bash(python3 _fix_final.py)",
+      "Bash(python3 -c \"from datasheet_rag import datasheet_rag; print\\('Import OK:', datasheet_rag\\)\")",
+      "Bash(python -c \"from docx import Document; doc = Document\\('uploads/upload_1775645255_你好.docx'\\); print\\('段落数:', len\\(doc.paragraphs\\)\\); [print\\(f'段落{i}: [{p.text.strip\\(\\)}]'\\) for i, p in enumerate\\(doc.paragraphs[:10]\\) if p.text.strip\\(\\)]\")",
+      "Bash(python -c \"from docx import Document; doc = Document\\(r'e:\\\\smart_assistant\\\\backend\\\\uploads\\\\upload_1775645255_你好.docx'\\); print\\('段落数:', len\\(doc.paragraphs\\)\\); [print\\(f'段落{i}: [{p.text.strip\\(\\)}]'\\) for i, p in enumerate\\(doc.paragraphs[:10]\\) if p.text.strip\\(\\)]\")",
+      "Bash(python -c \"from docx import Document; doc = Document\\(r'e:\\\\smart_assistant\\\\backend\\\\uploads\\\\upload_1775645255_你好呀.docx'\\); print\\('段落数:', len\\(doc.paragraphs\\)\\); paras = [p.text.strip\\(\\) for p in doc.paragraphs if p.text.strip\\(\\)]; print\\('非空段落数:', len\\(paras\\)\\); print\\('内容:', paras[:5] if paras else '无内容'\\)\")",
+      "Bash(python -c \"from paper_helper import generate_outline; result = generate_outline\\('人工智能在医疗领域的应用', 'computer'\\); print\\('结果:', result['content'][:200]\\)\")",
+      "Bash(python test_deepseek.py)",
+      "Bash(python test_model_fix.py)",
+      "Bash(python test_env_fix.py)",
+      "Bash(python -m py_compile paper_helper.py)"
+    ]
+  }
+}
